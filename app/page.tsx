@@ -1,11 +1,14 @@
 import Link from 'next/link';
 
+const brandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'Social Central';
+const brandTagline = process.env.NEXT_PUBLIC_BRAND_TAGLINE || 'Conteúdo e atendimento do Instagram, num lugar só';
+
 export default function Home() {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-2">Central do Instagram</h1>
-        <p className="text-slate-400">Gerencie conteúdo e atendimento em um único lugar</p>
+        <h1 className="text-4xl font-bold text-white mb-2">{brandName}</h1>
+        <p className="text-slate-400">{brandTagline}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -65,7 +68,7 @@ export default function Home() {
             <div className="text-3xl">⚙️</div>
             <h2 className="text-xl font-bold text-white">Configurações</h2>
             <p className="text-slate-400 text-sm">
-              Conecte Publora, Zernio e ChimaGi com segurança.
+              Conecte seus serviços de publicação, atendimento e CRM com segurança.
             </p>
             <div className="pt-2 text-orange-400 text-sm font-medium group-hover:gap-2 flex items-center transition-all">
               Configurar →
