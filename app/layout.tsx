@@ -5,9 +5,12 @@ import Link from 'next/link';
 
 const inter = Inter({ subsets: ['latin'] });
 
+const brandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'Social Central';
+const brandTagline = process.env.NEXT_PUBLIC_BRAND_TAGLINE || 'Conteúdo e atendimento do Instagram, num lugar só';
+
 export const metadata: Metadata = {
-  title: 'Central do Instagram',
-  description: 'Sistema de conteúdo e automação de atendimento no Instagram',
+  title: brandName,
+  description: brandTagline,
 };
 
 export default function RootLayout({
@@ -26,7 +29,7 @@ export default function RootLayout({
                   <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold">📱</span>
                   </div>
-                  <span className="font-bold text-lg text-white">Central do Instagram</span>
+                  <span className="font-bold text-lg text-white">{brandName}</span>
                 </Link>
 
                 <div className="flex gap-6">
@@ -65,7 +68,7 @@ export default function RootLayout({
 
           <footer className="border-t border-slate-700 bg-slate-900/50 mt-16 py-8">
             <div className="max-w-7xl mx-auto px-4 text-center text-slate-400 text-sm">
-              <p>Central do Instagram • Para Roberta Sena (@roberta.sena)</p>
+              <p>{brandName}</p>
               <p className="mt-2 text-xs">⚠️ Algumas integrações requerem API keys no .env</p>
             </div>
           </footer>
