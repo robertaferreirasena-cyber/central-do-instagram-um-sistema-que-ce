@@ -1,7 +1,7 @@
-// Cliente ChimaGi CRM - Integração de leads
-// Conecta leads de automação do Instagram com o CRM ChimaGi
+// Cliente CRM - Integração de leads
+// Conecta leads de automação do Instagram com o CRM
 
-interface ChimagiLead {
+interface CRMLead {
   id?: string;
   name: string;
   phone?: string;
@@ -17,33 +17,33 @@ interface ChimagiLead {
   created_at?: string;
 }
 
-interface ChimagiLeadResponse {
+interface CRMLeadResponse {
   id: string;
   created: boolean;
   duplicated: boolean;
   merged_with?: string;
 }
 
-const CHIMAGI_API_URL = process.env.CHIMAGI_API_URL || 'http://localhost:3001';
-const CHIMAGI_API_KEY = process.env.CHIMAGI_API_KEY;
+const CRM_API_URL = process.env.CRM_API_URL || 'http://localhost:3001';
+const CRM_API_KEY = process.env.CRM_API_KEY;
 
-export class ChimagiClient {
+export class CRMClient {
   private apiUrl: string;
   private apiKey: string;
 
   constructor() {
-    if (!CHIMAGI_API_KEY) {
-      console.warn('⚠️ CHIMAGI_API_KEY não configurada - leads não serão capturados');
+    if (!CRM_API_KEY) {
+      console.warn('⚠️ CRM_API_KEY não configurada - leads não serão capturados');
     }
-    this.apiUrl = CHIMAGI_API_URL;
-    this.apiKey = CHIMAGI_API_KEY || '';
+    this.apiUrl = CRM_API_URL;
+    this.apiKey = CRM_API_KEY || '';
   }
 
-  async createOrUpdateLead(lead: ChimagiLead): Promise<{ data: ChimagiLeadResponse | null; error: string | null }> {
+  async createOrUpdateLead(lead: CRMLead): Promise<{ data: CRMLeadResponse | null; error: string | null }> {
     if (!this.apiKey) {
       return {
         data: null,
-        error: 'CHIMAGI_API_KEY não configurada. Conecte o ChimaGi nas configurações.',
+        error: 'CRM_API_KEY não configurada. Conecte seu CRM nas configurações.',
       };
     }
 
@@ -74,7 +74,7 @@ export class ChimagiClient {
 
       if (!response.ok) {
         const error = await response.text();
-        return { data: null, error: `ChimaGi error: ${response.status}` };
+        return { data: null, error: `CRM error: ${response.status}` };
       }
 
       const data = await response.json();
@@ -118,7 +118,7 @@ export class ChimagiClient {
 
   async addConversationHistory(leadId: string, message: string, sender: 'lead' | 'system'): Promise<{ success: boolean; error?: string }> {
     if (!this.apiKey) {
-      return { success: false, error: 'CHIMAGI_API_KEY não configurada' };
+      return { success: false, error: 'CRM_API_KEY não configurada' };
     }
 
     try {
@@ -136,7 +136,7 @@ export class ChimagiClient {
       });
 
       if (!response.ok) {
-        return { success: false, error: `ChimaGi error: ${response.status}` };
+        return { success: false, error: `CRM error: ${response.status}` };
       }
 
       return { success: true };
@@ -147,4 +147,4 @@ export class ChimagiClient {
   }
 }
 
-export const chimagi = new ChimagiClient();
+export const crm = new CRMClient();
