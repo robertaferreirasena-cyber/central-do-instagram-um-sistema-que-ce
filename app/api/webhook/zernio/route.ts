@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { claude } from '@/lib/claude';
 import { zernio } from '@/lib/zernio';
-import { chimagi } from '@/lib/chimagi';
+import { crm } from '@/lib/chimagi';
 import { telegram } from '@/lib/telegram';
 import { InteractionStatus, ApiResponse } from '@/types';
 
@@ -129,24 +129,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7. Se precisa de humano, notificar Roberta e marcar para handoff
+    // 7. Se precisa de humano, notificar atendente e marcar para handoff
     if (shouldForward) {
       await supabase
         .from('instagram_interactions')
-        .update({ assigned_to: 'roberta' })
+        .update({ assigned_to: 'atendente' })
         .eq('id', interaction.id);
 
       await telegram.notifyHandoff({
         sender_username,
         message: content,
         interaction_id: interaction.id,
-        assigned_to: 'Roberta',
+        assigned_to: 'Atendente',
       });
     }
 
     // 8. Detectar interesse de compra e criar lead
     if (content.toLowerCase().includes('preço') || content.toLowerCase().includes('compra') || content.toLowerCase().includes('quanto custa')) {
-      const leadResult = await chimagi.createOrUpdateLead({
+      const leadResult = await crm.createOrUpdateLead({
         name: sender_username,
         instagram: sender_username,
         source: 'instagram_dm',
@@ -156,10 +156,10 @@ export async function POST(req: NextRequest) {
       if (leadResult.data && !leadResult.data.duplicated) {
         await supabase
           .from('instagram_interactions')
-          .update({ chimagi_lead_id: leadResult.data.id })
+          .update({ crm_lead_id: leadResult.data.id })
           .eq('id', interaction.id);
 
-        await chimagi.addConversationHistory(leadResult.data.id, content, 'lead');
+        await crm.addConversationHistory(leadResult.data.id, content, 'lead');
       }
     }
 
