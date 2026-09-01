@@ -34,7 +34,7 @@ export default function CreateContentPage() {
           caption: formData.caption,
           hashtags,
           scheduled_at: formData.scheduled_at,
-          created_by: 'roberta',
+          created_by: 'system',
         }),
       });
 
