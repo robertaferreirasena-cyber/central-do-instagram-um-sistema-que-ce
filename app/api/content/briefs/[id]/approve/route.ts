@@ -84,7 +84,7 @@ export async function POST(
           })
           .eq('id', id);
 
-        // Notificar Roberta no Telegram
+        // Notificar sobre erro de publicação
         await telegram.notifyPublished({
           post_type: brief.type,
           error: publishResult.error,
@@ -122,7 +122,7 @@ export async function POST(
         .update({ status: ContentStatus.PUBLISHED })
         .eq('id', id);
 
-      // Notificar Roberta
+      // Notificar sobre publicação
       await telegram.notifyPublished({
         post_type: brief.type,
         published_url: publishResult.data?.published_url,
