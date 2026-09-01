@@ -62,16 +62,16 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-white mb-4">📱 ChimaGi CRM</h2>
+          <h2 className="text-xl font-bold text-white mb-4">📱 CRM</h2>
           <p className="text-slate-400 text-sm mb-4">
             Integração com seu CRM para capturar leads. Configure via <code className="bg-black/30 px-2 py-1 rounded">.env</code>
           </p>
           <div className="space-y-3">
             <div className="bg-black/30 rounded p-3 font-mono text-sm text-slate-300">
-              CHIMAGI_API_URL=http://localhost:3001
+              CRM_API_URL=http://localhost:3001
             </div>
             <div className="bg-black/30 rounded p-3 font-mono text-sm text-slate-300">
-              CHIMAGI_API_KEY=your-key-here
+              CRM_API_KEY=your-key-here
             </div>
           </div>
           <p className="text-slate-500 text-xs mt-3">
@@ -82,7 +82,7 @@ export default function SettingsPage() {
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6">
           <h2 className="text-xl font-bold text-white mb-4">💌 Telegram</h2>
           <p className="text-slate-400 text-sm mb-4">
-            Notificações de handoff para você. Configure via <code className="bg-black/30 px-2 py-1 rounded">.env</code>
+            Notificações de escalonamento e alertas. Configure via <code className="bg-black/30 px-2 py-1 rounded">.env</code>
           </p>
           <div className="space-y-3">
             <div className="bg-black/30 rounded p-3 font-mono text-sm text-slate-300">
