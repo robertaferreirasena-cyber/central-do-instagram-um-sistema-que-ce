@@ -23,7 +23,7 @@ export default function KnowledgeBasePage() {
         body: JSON.stringify({
           ...formData,
           account_id: 'default-account',
-          created_by: 'roberta',
+          created_by: 'system',
         }),
       });
 
