@@ -101,7 +101,7 @@ Retorne APENAS um JSON válido (sem markdown) com:
     }
 
     try {
-      const prompt = `Você é assistente de atendimento ao cliente para Roberta Sena (@roberta.sena).
+      const prompt = `Você é assistente de atendimento ao cliente.
 
 ${req.knowledge_base ? `Base de conhecimento:\n${req.knowledge_base}\n\n` : ''}
 
