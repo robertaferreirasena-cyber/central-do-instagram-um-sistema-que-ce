@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { getContentAccountId } from '@/lib/tenant';
 
 const getSupabase = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -10,7 +11,9 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
-    const accountId = searchParams.get('accountId');
+    // account_id de attribution_events é UUID (FK) — resolve no servidor,
+    // ignorando valores de tenant TEXT como 'default-account' que dariam erro de UUID
+    const accountId = await getContentAccountId();
     const source = searchParams.get('source');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
@@ -29,25 +32,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Só colunas escalares — evita embeds via FK que o PostgREST não tem registradas
     let query = supabase
       .from('attribution_events')
       .select(
         `
         id,
         lead_id,
-        leads(nome),
         content_brief_id,
         campaign_id,
-        content_campaigns(nome),
         automation_id,
-        ig_automacoes(nome),
         funnel_id,
-        instagram_funnels(nome),
         order_id,
         hora
       `
-      )
-      .eq('account_id', accountId);
+      );
 
     if (from) {
       query = query.gte('hora', new Date(from).toISOString());
