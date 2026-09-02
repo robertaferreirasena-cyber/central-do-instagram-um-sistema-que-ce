@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FunnelsTab } from '@/components/FunnelsTab';
+import { AnalyticsTab } from '@/components/AnalyticsTab';
+import { LeadsTab } from '@/components/LeadsTab';
+import { AttributionTab } from '@/components/AttributionTab';
 
 const ONDE_OPTIONS = [
   { value: 'comentario', label: 'Comentário' },
@@ -176,11 +180,15 @@ export default function InstagramPage() {
       <h1 style={{ marginBottom: '2rem' }}>Central do Instagram — Automações</h1>
 
       {/* Abas */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #ddd' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #ddd', overflowX: 'auto' }}>
         {[
           { id: 'automacao', label: 'Automação' },
           { id: 'conteudo', label: 'Conteúdo' },
           { id: 'conversas', label: 'Conversas' },
+          { id: 'funis', label: '🔗 Funis' },
+          { id: 'analytics', label: '📊 Analytics' },
+          { id: 'leads', label: '👥 Leads' },
+          { id: 'attribution', label: '🎯 Attribution' },
         ].map((aba) => (
           <button
             key={aba.id}
@@ -651,12 +659,31 @@ export default function InstagramPage() {
         </div>
       )}
 
-      {/* Outras abas (placeholder) */}
-      {tab !== 'automacao' && (
+      {/* Aba Conteúdo */}
+      {tab === 'conteudo' && (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
-          Aba "{tab}" em desenvolvimento...
+          Aba Conteúdo em desenvolvimento...
         </div>
       )}
+
+      {/* Aba Conversas */}
+      {tab === 'conversas' && (
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+          Aba Conversas em desenvolvimento...
+        </div>
+      )}
+
+      {/* Aba Funis */}
+      {tab === 'funis' && <FunnelsTab />}
+
+      {/* Aba Analytics */}
+      {tab === 'analytics' && <AnalyticsTab />}
+
+      {/* Aba Leads */}
+      {tab === 'leads' && <LeadsTab />}
+
+      {/* Aba Attribution */}
+      {tab === 'attribution' && <AttributionTab />}
     </div>
   );
 }
