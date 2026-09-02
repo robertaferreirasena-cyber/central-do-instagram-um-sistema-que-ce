@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { TENANT_TEXT } from '@/lib/tenant';
 
 export default function PublicacoesPage() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export default function PublicacoesPage() {
 
   const loadPosts = async () => {
     try {
-      const res = await fetch('/api/content/briefs?account_id=default-account');
+      const res = await fetch(`/api/content/briefs?account_id=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         const all = Array.isArray(data.data) ? data.data : [];
@@ -84,7 +85,7 @@ export default function PublicacoesPage() {
         subtitle="Gerencie posts publicados, agendados e em rascunho"
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', width: '100%' }}>
         {/* Contas Conectadas */}
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', padding: '1.5rem', marginBottom: '2rem' }}>
           <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', color: '#7A8B84', letterSpacing: '0.1em' }}>
