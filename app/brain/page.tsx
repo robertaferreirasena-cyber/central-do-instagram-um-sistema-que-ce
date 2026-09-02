@@ -6,6 +6,7 @@ import BrainSidebar from '@/components/brain/BrainSidebar';
 import BrainEditor from '@/components/brain/BrainEditor';
 import BrainStats from '@/components/brain/BrainStats';
 import { useAuth } from '@/hooks/useAuth';
+import { BRAIN_ACCOUNT } from '@/lib/tenant';
 
 type SectionKey =
   | 'empresa'
@@ -39,7 +40,7 @@ export default function BrainPage() {
     async function loadBrainData() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/brain?account_id=${accountId || 'iaclub-default'}`);
+        const res = await fetch(`/api/brain?account_id=${accountId || BRAIN_ACCOUNT}`);
         if (res.ok) {
           const { data } = await res.json();
           setBrain(data);
@@ -66,7 +67,7 @@ export default function BrainPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          account_id: accountId || 'iaclub-default',
+          account_id: accountId || BRAIN_ACCOUNT,
           secoes: { [sectionKey]: updates },
         }),
       });
