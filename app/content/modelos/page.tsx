@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import TemplatePreview from '@/components/TemplatePreview';
 
 interface Template {
   id: number;
@@ -218,20 +219,14 @@ export default function ModelosPage() {
                       {template.proporcao}
                     </div>
 
-                    {/* Thumbnail */}
-                    <div
-                      style={{
-                        width: '100%',
-                        aspectRatio: template.proporcao === '9:16' ? '9/16' : template.proporcao === '1:1' ? '1' : '4/5',
-                        backgroundColor: '#E2E2DE',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        color: '#7A8B84',
-                      }}
-                    >
-                      {template.nome}
+                    {/* Thumbnail - TemplatePreview renderizado */}
+                    <div style={{ width: '100%' }}>
+                      <TemplatePreview
+                        nome={template.nome}
+                        proporcao={template.proporcao}
+                        combinacao="editorial"
+                        miniatura={true}
+                      />
                     </div>
 
                     {/* Nome e descrição */}
