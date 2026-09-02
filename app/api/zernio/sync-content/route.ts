@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Chamar GET /analytics do Zernio
-    const { data: analyticsData, error: analyticsError } = await zernio.getAnalytics('instagram', 30);
+    // 2. Chamar GET /analytics do Zernio (todas as plataformas — Central de Marketing multi-canal)
+    const { data: analyticsData, error: analyticsError } = await zernio.getAnalytics('', 30);
 
     if (analyticsError || !analyticsData) {
       console.error('Erro ao buscar analytics do Zernio:', analyticsError);
