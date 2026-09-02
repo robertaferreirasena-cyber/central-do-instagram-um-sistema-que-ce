@@ -91,7 +91,8 @@ export function avisosDoGrafo(flow: Flow, trigger: any = null): ValidacaoGrafo {
   for (const step of steps) {
     if (step.type === 'quick_replies' && step.buttons && step.buttons.length > 0) {
       for (let i = 0; i < step.buttons.length; i++) {
-        const buttonEdgeExists = false; // Simplificado: verificar se há edge para btn:N
+        const buttonHandle = `btn:${i}`;
+        const buttonEdgeExists = edges.some((e: any) => e.from === step.id && e.handle === buttonHandle);
         if (!buttonEdgeExists) {
           avisos.push({
             tipo: 'aviso',
