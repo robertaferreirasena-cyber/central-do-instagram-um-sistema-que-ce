@@ -1,4 +1,5 @@
 import { supabase, dbQuery } from './db';
+import { canSendFollowReminder } from './variables';
 
 export interface FlowStep {
   id: string;
@@ -220,18 +221,57 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
         break;
 
       case 'follow_gate':
-        // Portão de seguidor: verifica se segue (simplificado, null = libera)
-        actions.push({
-          type: 'send_message',
-          text: step.content || '',
-          quick_replies: step.buttons || [],
-          is_private: true,
-        });
-        newRun.status = 'waiting';
-        newRun.current_step = currentStepIndex;
-        isRunning = false;
-        // Registra no contexto que aguarda verificação de follow
-        context._follow_gate_pending = true;
+        // Portão de seguidor com degradação graciosa (null = libera, max 5 lembretes/dia)
+        const followsAccount = context._follows_account;
+
+        if (followsAccount === null || followsAccount === undefined) {
+          // Meta não informou segue? status: Libera e registra
+          console.log('ℹ️ Follow status null, liberando (degradação graciosa):', newRun.id);
+
+          // Log em Atividade
+          await supabase
+            .from('crm_eventos')
+            .insert({
+              tipo: 'flow_follow_gate_degraded',
+              payload: {
+                run_id: newRun.id,
+                reason: 'Meta did not return follow status',
+                fallback: 'allowed',
+              },
+              created_at: new Date(),
+            })
+            .catch((err: any) => console.warn('⚠️ Erro ao registrar evento de degradação:', err));
+
+          // Avança sem parar
+          currentStepIndex++;
+          break;
+        }
+
+        // Se segue? Avança; senão, oferece reminder
+        if (followsAccount === true) {
+          currentStepIndex++;
+        } else if (followsAccount === false) {
+          // Não segue: oferece reminder (máx 5/dia)
+          const contactId = context._contact_id || '';
+          if (contactId && canSendFollowReminder(contactId)) {
+            actions.push({
+              type: 'send_message',
+              text: step.content || 'Siga-nos para continuar',
+              quick_replies: step.buttons || [],
+              is_private: true,
+            });
+            newRun.status = 'waiting';
+            newRun.current_step = currentStepIndex;
+            isRunning = false;
+          } else {
+            // Limite de lembretes atingido: salta para o próximo passo
+            console.log('⏭️ Limite de lembretes de follow atingido, continuando:', contactId);
+            currentStepIndex++;
+          }
+        } else {
+          // Status desconhecido (booleano inválido): libera com cautela
+          currentStepIndex++;
+        }
         break;
 
       case 'tag':
