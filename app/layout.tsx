@@ -41,6 +41,7 @@ export default function RootLayout({
           @media (max-width: 1023px) {
             [data-role="content"] {
               margin-left: 0;
+              padding-top: 3.5rem;
             }
           }
         `}</style>
