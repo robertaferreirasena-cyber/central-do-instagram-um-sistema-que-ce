@@ -12,14 +12,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ tag, title, subtitle, actions }: PageHeaderProps) {
   return (
-    <div style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: '#FAFAF8', paddingBottom: '2rem', marginLeft: '280px' }}>
-      <style>{`
-        @media (max-width: 899px) {
-          .page-header {
-            margin-left: 0;
-          }
-        }
-      `}</style>
+    <div style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: '#FAFAF8', paddingBottom: '2rem', width: '100%' }}>
       <div style={{ padding: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '2rem' }}>
         <div style={{ flex: 1 }}>
           {tag && (
