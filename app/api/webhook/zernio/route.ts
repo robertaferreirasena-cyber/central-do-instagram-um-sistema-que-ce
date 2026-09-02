@@ -51,6 +51,18 @@ export async function POST(req: NextRequest) {
     if (parsed.tipo === 'comment.received') {
       console.log('📝 Comentário recebido:', parsed.comment_id, parsed.texto);
 
+      // TRAVA 1: É comentário NOSSO? (from.id == conta E @username == nosso)
+      if (parsed.isOurComment) {
+        console.log('⏭️ Ignorando comentário nosso (anti-loop):', parsed.comment_id);
+        return NextResponse.json({ success: true, data: { skipped: true, reason: 'own_comment' } } as ApiResponse<any>);
+      }
+
+      // TRAVA 2: Tem parent_id? (resposta dentro de thread) → ignora
+      if (parsed.parent_id) {
+        console.log('⏭️ Ignorando resposta em thread (anti-loop):', parsed.comment_id);
+        return NextResponse.json({ success: true, data: { skipped: true, reason: 'reply_in_thread' } } as ApiResponse<any>);
+      }
+
       const comentario: CommentPayload = {
         comment_id: parsed.comment_id || '',
         media_id: parsed.media_id || '',
@@ -103,6 +115,17 @@ interface ParsedEvent {
   is_story_reply: boolean;
   comment_id?: string;
   media_id?: string;
+  isOurComment?: boolean;
+  parent_id?: string;
+}
+
+// Normalizar handle para comparação (remove @, espaços, minúscula)
+function normalizeHandle(handle: string): string {
+  if (!handle) return '';
+  return handle
+    .toLowerCase()
+    .replace(/^@/, '')
+    .trim();
 }
 
 // Parsing defensivo do evento Zernio (tolerante a aninhamento)
@@ -165,6 +188,14 @@ function parseEvento(payload: any): ParsedEvent | null {
     const comment_id = payload.comment_id || payload.commentId || data.comment_id || '';
     const media_id = payload.media_id || payload.mediaId || data.media_id || payload.instagram_id || '';
 
+    // ANTI-LOOP: Detectar se é comentário nosso (from.id == account_id)
+    const isOurComment = remetente_id === account_id ||
+                         (remetente_handle && account_id &&
+                          normalizeHandle(remetente_handle) === normalizeHandle(account_id));
+
+    // ANTI-LOOP: Detectar resposta em thread (parent_id presente)
+    const parent_id = payload.parent_id || payload.parentId || data.parent_id || data.parentId || '';
+
     return {
       evento_id: payload.evento_id || payload.id || msg_id,
       tipo,
@@ -182,6 +213,8 @@ function parseEvento(payload: any): ParsedEvent | null {
       is_story_reply,
       comment_id,
       media_id,
+      isOurComment,
+      parent_id,
     };
   } catch (err) {
     console.error('Erro ao parsear evento:', err);
