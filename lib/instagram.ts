@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/db';
 import { zernio } from '@/lib/zernio';
 import { enqueue } from '@/lib/sendQueue';
+import { normalizeText } from '@/lib/utils';
 
 // ============================================================
 // 6.3 CORRESPONDÊNCIA (_ig_automacao_match)
@@ -74,20 +75,20 @@ export async function igAutomacaoMatch(
 
       const palavras = auto.gatilho
         .split(',')
-        .map((p) => p.trim().toLowerCase())
+        .map((p) => normalizeText(p))
         .filter((p) => p);
 
-      const textoLower = texto.toLowerCase();
+      const textoNormalizado = normalizeText(texto);
 
       // Verificar correspondência
       for (const palavra of palavras) {
-        if (auto.match_tipo === 'exata' && textoLower === palavra) {
+        if (auto.match_tipo === 'exata' && textoNormalizado === palavra) {
           return true;
         }
-        if (auto.match_tipo === 'comeca' && textoLower.startsWith(palavra)) {
+        if (auto.match_tipo === 'comeca' && textoNormalizado.startsWith(palavra)) {
           return true;
         }
-        if (auto.match_tipo === 'contem' && textoLower.includes(palavra)) {
+        if (auto.match_tipo === 'contem' && textoNormalizado.includes(palavra)) {
           return true;
         }
       }
