@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
-    const accountId = searchParams.get('accountId');
+    const accountId = searchParams.get('account_id') || searchParams.get('accountId') || 'default-account';
 
-    let query = supabase.from('instagram_funnels').select('*');
+    let query = supabase.from('flows').select('id, nome, enabled, criado_em, atualizado_em');
 
     if (accountId) {
       query = query.eq('account_id', accountId);
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: data || [] });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
