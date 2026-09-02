@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS base_conhecimento (
 CREATE TABLE IF NOT EXISTS agente_sugestoes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversa_id TEXT NOT NULL,
-  agente_id UUID REFERENCES agents(id) ON DELETE CASCADE,
+  agente_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
   sugestao TEXT NOT NULL,
   status TEXT DEFAULT 'pendente',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
