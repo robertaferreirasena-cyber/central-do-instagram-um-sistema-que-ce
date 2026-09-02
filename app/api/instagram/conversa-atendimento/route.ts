@@ -3,6 +3,49 @@ import { supabase } from '@/lib/db';
 import { autoResponder } from '@/lib/agente';
 import { ApiResponse } from '@/types';
 
+// GET /api/instagram/conversa-atendimento
+// Lista conversas do account_id (Zernio)
+export async function GET(req: NextRequest) {
+  try {
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Supabase não configurado' } as ApiResponse<null>,
+        { status: 500 }
+      );
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const account_id = searchParams.get('account_id') || 'default-account';
+
+    // Buscar conversas ordenadas por updated_time desc
+    const { data: conversations, error } = await supabase
+      .from('zernio_conversations')
+      .select('id, participant_username, participant_name, participant_picture_url, last_message, unread_count, estado, updated_time')
+      .eq('account_id', account_id)
+      .order('updated_time', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar conversas:', error);
+      return NextResponse.json(
+        { success: false, error: error.message } as ApiResponse<null>,
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, data: conversations || [] } as ApiResponse<any>,
+      { status: 200 }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Erro em GET conversa-atendimento:', message);
+    return NextResponse.json(
+      { success: false, error: message } as ApiResponse<null>,
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/instagram/conversa-atendimento
 // Quando selecionado um agente na inbox, dispara autoResponder na hora
 export async function POST(req: NextRequest) {
