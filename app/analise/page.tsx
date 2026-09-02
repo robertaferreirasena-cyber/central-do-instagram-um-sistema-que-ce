@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { TENANT_TEXT } from '@/lib/tenant';
 
 type TabType = 'conteudo' | 'funis' | 'leads';
 
@@ -39,7 +40,7 @@ export default function AnalisePage() {
 
   const loadBriefs = async () => {
     try {
-      const res = await fetch('/api/content/briefs?account_id=default-account');
+      const res = await fetch(`/api/content/briefs?account_id=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         setBriefs(Array.isArray(data.data) ? data.data : []);
@@ -63,7 +64,7 @@ export default function AnalisePage() {
 
   const loadAttribution = async () => {
     try {
-      const res = await fetch('/api/instagram/attribution?accountId=default-account');
+      const res = await fetch(`/api/instagram/attribution?accountId=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         if (data.summary) {
@@ -142,7 +143,7 @@ export default function AnalisePage() {
         }
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', width: '100%' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '1px solid #E2E2DE', paddingBottom: '1rem' }}>
           {(['conteudo', 'funis', 'leads'] as const).map((t) => (
