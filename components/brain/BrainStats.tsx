@@ -7,7 +7,8 @@ interface BrainStatsProps {
 }
 
 export default function BrainStats({ brain }: BrainStatsProps) {
-  const score = computeScore(brain);
+  // Usar o score real salvo no brain, não recomputar
+  const score = brain.score || computeScore(brain);
   const percentage = Math.round((score / 100) * 100);
 
   const getStatus = () => {
@@ -25,14 +26,20 @@ export default function BrainStats({ brain }: BrainStatsProps) {
     { label: 'Funis de automação', icon: '⚙️', active: false },
   ];
 
-  const missingFields = [];
+  // Gerar lista de campos faltantes dinamicamente (seções vazias ou sem conteúdo)
+  const missingFields: string[] = [];
   const sec = brain.secoes;
 
-  if (!sec.empresa?.nome) missingFields.push('Nome da empresa');
-  if (!sec.tom_de_voz?.como_falamos) missingFields.push('Tom de voz');
-  if (!sec.perguntas_frequentes?.items?.length) missingFields.push('Perguntas frequentes');
-  if (!sec.politicas?.nao_pode_dizer?.length) missingFields.push('Políticas');
-  if (!sec.publico?.persona) missingFields.push('Público-alvo');
+  // Verificar cada seção de forma agnóstica (string ou objeto)
+  Object.entries(sec || {}).forEach(([key, value]: [string, any]) => {
+    if (!value) {
+      missingFields.push(key.replace(/_/g, ' '));
+    } else if (typeof value === 'string' && !value.trim()) {
+      missingFields.push(key.replace(/_/g, ' '));
+    } else if (typeof value === 'object' && Object.values(value).every(v => !v)) {
+      missingFields.push(key.replace(/_/g, ' '));
+    }
+  });
 
   return (
     <div className="w-72 flex-shrink-0 space-y-4">
