@@ -13,6 +13,7 @@ interface AttributionSummary {
 
 export default function AnalisePage() {
   const [briefs, setBriefs] = useState<any[]>([]);
+  const [mediaPosts, setMediaPosts] = useState<any[]>([]);
   const [tab, setTab] = useState<TabType>('conteudo');
   const [period, setPeriod] = useState('30dias');
   const [attribution, setAttribution] = useState<AttributionSummary>({
@@ -28,6 +29,7 @@ export default function AnalisePage() {
   useEffect(() => {
     loadBriefs();
     loadAttribution();
+    loadContent();
     // Inicializar métricas aleatórias apenas uma vez no cliente
     setRandomMetrics({
       clicks: Math.floor(Math.random() * 500),
@@ -44,6 +46,18 @@ export default function AnalisePage() {
       }
     } catch (error) {
       console.error('Erro ao carregar briefs:', error);
+    }
+  };
+
+  const loadContent = async () => {
+    try {
+      const res = await fetch('/api/instagram/content?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        setMediaPosts(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar conteúdo:', error);
     }
   };
 
@@ -163,7 +177,7 @@ export default function AnalisePage() {
                 </h3>
               </div>
 
-              {briefs.filter((b) => b.status === 'published').length === 0 ? (
+              {mediaPosts.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: '#7A8B84' }}>
                   <p style={{ margin: 0, fontSize: '0.875rem' }}>Sem dados suficientes</p>
                 </div>
@@ -172,47 +186,41 @@ export default function AnalisePage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: '#F8F8F8' }}>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Conteúdo
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Formato
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Objetivo
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Cliques no CTA
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Leads gerados
-                        </th>
+                        {['Conteúdo', 'Formato', 'Alcance', 'Curtidas', 'Comentários'].map((h) => (
+                          <th key={h} style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#7A8B84', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {briefs
-                        .filter((b) => b.status === 'published')
-                        .map((brief, idx) => (
-                          <tr key={brief.id} style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F8F8F8' }}>
-                            <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 500 }}>
-                              {brief.theme}
-                            </td>
-                            <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E' }}>
-                              <span style={{ backgroundColor: getTypeColor(brief.type), color: '#FFFFFF', padding: '0.25rem 0.5rem', borderRadius: '0', fontSize: '0.75rem', fontWeight: 600 }}>
-                                {brief.type}
-                              </span>
-                            </td>
-                            <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E' }}>
-                              {brief.objective || 'Não definido'}
-                            </td>
-                            <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
-                              0
-                            </td>
-                            <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
-                              0
-                            </td>
-                          </tr>
-                        ))}
+                      {mediaPosts.map((post, idx) => (
+                        <tr key={post.id || idx} style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F8F8F8' }}>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 500, maxWidth: '360px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {post.permalink ? (
+                              <a href={post.permalink} target="_blank" rel="noreferrer" style={{ color: '#0E2A2E', textDecoration: 'none' }}>
+                                {(post.caption || 'Sem legenda').slice(0, 70)}
+                              </a>
+                            ) : (
+                              (post.caption || 'Sem legenda').slice(0, 70)
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E' }}>
+                            <span style={{ backgroundColor: getTypeColor(post.tipo), color: '#FFFFFF', padding: '0.25rem 0.5rem', borderRadius: '0', fontSize: '0.75rem', fontWeight: 600 }}>
+                              {post.tipo || 'post'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
+                            {post.alcance ?? 0}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
+                            {post.curtidas ?? 0}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
+                            {post.comentarios ?? 0}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
