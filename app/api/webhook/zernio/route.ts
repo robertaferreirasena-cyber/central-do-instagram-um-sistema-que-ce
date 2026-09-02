@@ -1,166 +1,276 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { claude } from '@/lib/claude';
-import { zernio } from '@/lib/zernio';
-import { crm } from '@/lib/chimagi';
-import { telegram } from '@/lib/telegram';
-import { InteractionStatus, ApiResponse } from '@/types';
+import { zernio, ZernioClient, type ZernioConversation, type ZernioMessage } from '@/lib/zernio';
+import { downloadMediaToStorage } from '@/lib/storage';
+import { ApiResponse } from '@/types';
 
-// POST - Webhook de Zernio (DM/comentário)
+// POST - Webhook de Zernio (message.received, conversation.started, comment.received)
 export async function POST(req: NextRequest) {
   try {
-    const event = await req.json();
-
-    // Payload Zernio real:
-    // { conversation_id, message_id, sender_username, content, platform, profile_id, created_at }
-    const { conversation_id, message_id, sender_username, content, platform, profile_id, created_at } = event;
-
-    if (!sender_username || !content || !message_id) {
+    if (!supabase) {
       return NextResponse.json(
-        { success: false, error: 'Campos obrigatórios faltando' } as ApiResponse<null>,
-        { status: 400 }
+        { success: false, error: 'Supabase não configurado' } as ApiResponse<null>,
+        { status: 500 }
       );
     }
 
-    // 1. Buscar account pela profile_id do Zernio
-    const { data: account } = await supabase
-      .from('instagram_accounts')
-      .select('id, zernio_profile_id')
-      .eq('zernio_profile_id', profile_id)
-      .single();
+    // 1. Ler corpo CRU e validar HMAC-SHA256
+    const rawBody = await req.text();
+    const signature = req.headers.get('X-Zernio-Signature') || '';
+    const secret = process.env.ZERNIO_WEBHOOK_SECRET;
 
-    if (!account) {
-      console.warn(`Account não encontrada para profile_id: ${profile_id}`);
+    if (!secret || !signature) {
+      console.warn('⚠️ Webhook Zernio: secret ou signature ausentes');
       return NextResponse.json(
-        { success: true, data: { skipped: true, reason: 'account_not_found' } } as ApiResponse<any>
+        { success: false, error: 'Autenticação falhou' } as ApiResponse<null>,
+        { status: 401 }
       );
     }
 
-    // 2. Dedupe por external_event_id (message_id único do Zernio)
+    if (!ZernioClient.verifySignature(secret, rawBody, signature)) {
+      console.warn('❌ Webhook Zernio: assinatura HMAC inválida');
+      return NextResponse.json(
+        { success: false, error: 'Assinatura inválida' } as ApiResponse<null>,
+        { status: 401 }
+      );
+    }
+
+    const payload = JSON.parse(rawBody);
+
+    // 2. Parsing defensivo do evento
+    const parsed = parseEvento(payload);
+
+    if (!parsed) {
+      console.warn('⚠️ Webhook Zernio: evento mal-formado ou sem dados relevantes');
+      return NextResponse.json({ success: true, data: { skipped: true } } as ApiResponse<any>);
+    }
+
+    // 3. Se comentário, processar via motor de comentários (fase 4)
+    if (parsed.tipo === 'comment.received') {
+      console.log('📝 Comentário recebido:', parsed.comment_id, parsed.texto);
+      return NextResponse.json({ success: true, data: { comment: true } } as ApiResponse<any>);
+    }
+
+    // 4. Se mensagem ou conversa iniciada, processar inbox
+    if (parsed.tipo === 'message.received' || parsed.tipo === 'conversation.started') {
+      await ingerirMensagem(parsed);
+      return NextResponse.json({ success: true, data: { ingested: true } } as ApiResponse<any>);
+    }
+
+    return NextResponse.json({ success: true, data: { skipped: true } } as ApiResponse<any>);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Webhook Zernio error:', message);
+    return NextResponse.json(
+      { success: false, error: message } as ApiResponse<null>,
+      { status: 500 }
+    );
+  }
+}
+
+// Tipos do evento parseado
+interface ParsedEvent {
+  evento_id: string;
+  tipo: string;
+  platform: string;
+  account_id: string;
+  conversation_id: string;
+  remetente_id?: string;
+  remetente_nome?: string;
+  remetente_handle?: string;
+  telefone?: string;
+  texto: string;
+  media_url?: string;
+  media_tipo?: string;
+  msg_id: string;
+  story_id?: string;
+  story_url?: string;
+  is_story_reply: boolean;
+  comment_id?: string;
+}
+
+// Parsing defensivo do evento Zernio (tolerante a aninhamento)
+function parseEvento(payload: any): ParsedEvent | null {
+  try {
+    // Extrair tipo de evento
+    const tipo = payload.type || payload.evento || payload.event || '';
+
+    // Coagir dict→id (helper para account_id/conversation_id que podem vir como objeto)
+    const _coerce = (val: any): string => {
+      if (typeof val === 'string') return val;
+      if (val && typeof val === 'object' && val.id) return val.id;
+      if (val && typeof val === 'object' && val._id) return val._id;
+      return String(val || '');
+    };
+
+    // Extrair dados de diferentes localizações possíveis (defensivo)
+    const data = payload.data || payload.message || payload;
+    const conversation_id = _coerce(payload.conversation_id || payload.conversationId || data.conversation_id || data.conversationId || '');
+    const account_id = _coerce(payload.account_id || payload.accountId || data.account_id || data.accountId || '');
+    const msg_id = payload.message_id || payload.messageId || data.id || payload.id || '';
+    const texto = payload.message || payload.content || data.message || data.content || '';
+
+    // Extrair remetente/participante
+    const sender = payload.sender || payload.contact || payload.participant || data.sender || data.contact || {};
+    const remetente_id = _coerce(sender.id || sender._id || '');
+    const remetente_nome = sender.name || payload.sender_name || '';
+    const remetente_handle = sender.username || payload.sender_username || '';
+
+    // Platform
+    const platform = payload.platform || data.platform || 'instagram';
+
+    // Detectar story reply
+    const is_story_reply = !!(
+      payload.message?.reply_to?.story ||
+      data.reply_to?.story ||
+      payload.story_id ||
+      data.story_id ||
+      payload.messageType?.includes('story') ||
+      data.messageType?.includes('story')
+    );
+
+    const story_id = payload.story_id || data.story_id || '';
+
+    // Mídia (attachments)
+    let media_url = '';
+    let media_tipo = '';
+    const attachments = payload.attachments || payload.message?.attachments || data.attachments || [];
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      const att = attachments[0];
+      media_url = att.url || att.payload?.url || '';
+      media_tipo = att.type || '';
+    }
+
+    // Mínimo de dados válidos
+    if (!conversation_id || !msg_id || (!texto && !media_url)) {
+      return null;
+    }
+
+    return {
+      evento_id: payload.evento_id || payload.id || msg_id,
+      tipo,
+      platform,
+      account_id,
+      conversation_id,
+      remetente_id,
+      remetente_nome,
+      remetente_handle,
+      texto,
+      media_url,
+      media_tipo,
+      msg_id,
+      story_id,
+      is_story_reply,
+    };
+  } catch (err) {
+    console.error('Erro ao parsear evento:', err);
+    return null;
+  }
+}
+
+// Porta única de entrada: ingerir mensagem no Supabase
+async function ingerirMensagem(parsed: ParsedEvent) {
+  if (!supabase) return;
+
+  try {
+    // 1. Verificar se é dedupe por id_externo
     const { data: existing } = await supabase
-      .from('instagram_interactions')
+      .from('zernio_messages')
       .select('id')
-      .eq('external_event_id', message_id)
-      .eq('account_id', account.id)
+      .eq('id_externo', parsed.msg_id)
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ success: true, data: { duplicate: true } } as ApiResponse<any>);
+      console.log('ℹ️ Mensagem duplicada, ignorando:', parsed.msg_id);
+      return;
     }
 
-    // 3. Buscar base de conhecimento
-    const { data: knowledgeBase } = await supabase
-      .from('base_conhecimento')
-      .select('id, question, answer, confidence_threshold')
-      .eq('account_id', account.id)
-      .eq('active', true);
+    // 2. Resolver a conta pelo account_id ou platform
+    let account_id = parsed.account_id;
+    if (!account_id) {
+      // Fallback: buscar por platform
+      const { data: account } = await supabase
+        .from('zernio_accounts')
+        .select('account_id')
+        .eq('platform', parsed.platform)
+        .limit(1)
+        .maybeSingle();
 
-    // 4. Gerar resposta via Claude
-    const kbText = knowledgeBase?.map((k: any) => `P: ${k.question}\nR: ${k.answer}`).join('\n\n') || 'Base vazia';
-
-    const genResult = await claude.generateResponse({
-      interaction_content: content,
-      knowledge_base: kbText,
-    });
-
-    let autoResponse = '';
-    let shouldForward = false;
-    let baseKbId: string | null = null;
-    let confidence = 0;
-
-    if (genResult.data) {
-      autoResponse = genResult.data.response;
-      shouldForward = genResult.data.should_forward_to_human;
-      confidence = genResult.data.confidence;
-
-      if (!shouldForward && knowledgeBase) {
-        const matchedKb = knowledgeBase.find((k: any) => k.answer.toLowerCase().includes(autoResponse.toLowerCase().substring(0, 20)));
-        if (matchedKb) {
-          baseKbId = matchedKb.id;
-        }
+      if (account) {
+        account_id = account.account_id;
       }
     }
 
-    // 5. Criar interação com dedupe
-    const interactionStatus = shouldForward ? InteractionStatus.PENDING_HUMAN : InteractionStatus.AUTO_RESPONDED;
+    if (!account_id) {
+      console.warn('⚠️ Não foi possível resolver account_id para:', parsed.conversation_id);
+      return;
+    }
 
-    const { data: interaction, error: interactionError } = await supabase
-      .from('instagram_interactions')
-      .insert([
+    // 3. Upsert da conversa
+    const { data: conversation, error: convError } = await supabase
+      .from('zernio_conversations')
+      .upsert(
         {
-          account_id: account.id,
-          external_event_id: message_id,
-          sender_username,
-          interaction_type: 'dm',
-          content,
-          status: interactionStatus,
-          auto_response: autoResponse || null,
-          base_conhecimento_id: baseKbId,
-          confidence_score: confidence,
-          zernio_message_id: message_id,
-          platform: platform || 'instagram',
-          created_at: created_at ? new Date(created_at) : new Date(),
+          zernio_conversa: parsed.conversation_id,
+          zernio_account: account_id,
+          participant_id: parsed.remetente_id,
+          participant_username: parsed.remetente_handle,
+          participant_name: parsed.remetente_nome,
+          last_message: parsed.texto,
+          origem: parsed.is_story_reply ? 'story_reply' : 'direct',
+          unread_count: 1,
+          updated_time: new Date().toISOString(),
           updated_at: new Date(),
         },
-      ])
+        {
+          onConflict: 'zernio_conversa,zernio_account',
+        }
+      )
       .select()
       .single();
 
-    if (interactionError) {
-      console.error('Erro ao criar interação:', interactionError);
-      return NextResponse.json(
-        { success: false, error: interactionError.message } as ApiResponse<null>,
-        { status: 400 }
+    if (convError || !conversation) {
+      console.error('Erro ao upsert conversa:', convError);
+      return;
+    }
+
+    // 4. Baixar mídia se houver
+    let storedMediaUrl = parsed.media_url;
+    if (parsed.media_url && parsed.media_tipo) {
+      const { url, error: storageError } = await downloadMediaToStorage(
+        parsed.media_url,
+        parsed.media_tipo as 'image' | 'video',
+        parsed.msg_id
       );
-    }
 
-    // 6. Se confiança alta, responder automaticamente via Zernio
-    if (!shouldForward && autoResponse) {
-      const sendResult = await zernio.sendMessage(conversation_id, autoResponse);
-
-      if (sendResult.error) {
-        console.error('Erro ao enviar resposta:', sendResult.error);
+      if (url) {
+        storedMediaUrl = url;
+      } else if (storageError) {
+        console.warn('Erro ao fazer download de mídia:', storageError);
       }
     }
 
-    // 7. Se precisa de humano, notificar atendente
-    if (shouldForward) {
-      await supabase
-        .from('instagram_interactions')
-        .update({ assigned_to: 'atendente' })
-        .eq('id', interaction.id);
-
-      await telegram.notifyHandoff({
-        sender_username,
-        message: content,
-        interaction_id: interaction.id,
-        assigned_to: 'Atendente',
-      });
-    }
-
-    // 8. Detectar interesse de compra e criar lead
-    if (content.toLowerCase().includes('preço') || content.toLowerCase().includes('compra') || content.toLowerCase().includes('quanto custa')) {
-      const leadResult = await crm.createOrUpdateLead({
-        name: sender_username,
-        instagram: sender_username,
-        source: 'instagram_dm',
-        notes: `Interação ID: ${interaction.id}\nMensagem: ${content}`,
+    // 5. Inserir mensagem (idempotente por id_externo)
+    const { error: msgError } = await supabase
+      .from('zernio_messages')
+      .insert({
+        conversation_id: conversation.id,
+        id_externo: parsed.msg_id,
+        autor: parsed.remetente_nome || parsed.remetente_handle,
+        direcao: 'in',
+        content: parsed.texto,
+        media_url: storedMediaUrl,
+        media_tipo: parsed.media_tipo,
+        created_at: new Date(),
       });
 
-      if (leadResult.data && !leadResult.data.duplicated) {
-        await supabase
-          .from('instagram_interactions')
-          .update({ crm_lead_id: leadResult.data.id })
-          .eq('id', interaction.id);
-
-        await crm.addConversationHistory(leadResult.data.id, content, 'lead');
-      }
+    if (msgError) {
+      console.error('Erro ao inserir mensagem:', msgError);
+      return;
     }
 
-    return NextResponse.json({ success: true, data: { created: true, interaction_id: interaction.id } } as ApiResponse<any>);
+    console.log('✅ Mensagem ingerida:', parsed.msg_id);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Webhook error:', message);
-    return NextResponse.json({ success: false, error: message } as ApiResponse<null>, { status: 500 });
+    console.error('❌ Erro ao ingerir mensagem:', err);
   }
 }
