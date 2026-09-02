@@ -121,7 +121,7 @@ export default function DashboardPage() {
         tag="CENTRAL DE MARKETING"
         title="O que precisa da sua atenção hoje"
         actions={
-          <Link href="/conteudo" style={{ textDecoration: 'none' }}>
+          <Link href="/content" style={{ textDecoration: 'none' }}>
             <button style={{ backgroundColor: '#D6F24B', color: '#0E2A2E', padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
               + Criar publicação
             </button>
