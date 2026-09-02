@@ -3,6 +3,7 @@ import { supabase } from '@/lib/db';
 import { zernio, ZernioClient, type ZernioConversation, type ZernioMessage } from '@/lib/zernio';
 import { downloadMediaToStorage } from '@/lib/storage';
 import { ApiResponse } from '@/types';
+import { processarComentario, processarStoryReply, type CommentPayload, type StoryReplyPayload } from '@/lib/instagram';
 
 // POST - Webhook de Zernio (message.received, conversation.started, comment.received)
 export async function POST(req: NextRequest) {
@@ -45,9 +46,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: { skipped: true } } as ApiResponse<any>);
     }
 
-    // 3. Se comentário, processar via motor de comentários (fase 4)
+    // 3. Se comentário, processar via motor de comentários (fase 3)
     if (parsed.tipo === 'comment.received') {
       console.log('📝 Comentário recebido:', parsed.comment_id, parsed.texto);
+
+      const comentario: CommentPayload = {
+        comment_id: parsed.comment_id || '',
+        media_id: parsed.media_id || '',
+        account_id: parsed.account_id,
+        texto: parsed.texto,
+        autor_id: parsed.remetente_id || '',
+        autor_nome: parsed.remetente_nome || '',
+        author_username: parsed.remetente_handle || '',
+        platform: parsed.platform,
+      };
+
+      await processarComentario(comentario);
       return NextResponse.json({ success: true, data: { comment: true } } as ApiResponse<any>);
     }
 
@@ -87,6 +101,7 @@ interface ParsedEvent {
   story_url?: string;
   is_story_reply: boolean;
   comment_id?: string;
+  media_id?: string;
 }
 
 // Parsing defensivo do evento Zernio (tolerante a aninhamento)
@@ -146,6 +161,9 @@ function parseEvento(payload: any): ParsedEvent | null {
       return null;
     }
 
+    const comment_id = payload.comment_id || payload.commentId || data.comment_id || '';
+    const media_id = payload.media_id || payload.mediaId || data.media_id || payload.instagram_id || '';
+
     return {
       evento_id: payload.evento_id || payload.id || msg_id,
       tipo,
@@ -161,6 +179,8 @@ function parseEvento(payload: any): ParsedEvent | null {
       msg_id,
       story_id,
       is_story_reply,
+      comment_id,
+      media_id,
     };
   } catch (err) {
     console.error('Erro ao parsear evento:', err);
