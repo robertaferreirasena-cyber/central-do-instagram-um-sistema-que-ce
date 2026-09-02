@@ -1,408 +1,185 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { ContentType, ContentStatus } from '@/types';
+import { useState } from 'react';
+import { PageHeader } from '@/components/PageHeader';
+import { Archivo } from 'next/font/google';
 
-type TabType = 'estudio' | 'aprovacao' | 'calendario' | 'biblioteca';
+const archivo = Archivo({ subsets: ['latin'], weight: ['600', '800', '900'] });
 
-export default function ContentPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('estudio');
-  const [briefs, setBriefs] = useState<any[]>([]);
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [mediaItems, setMediaItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [accountId] = useState('default-account');
+const templates = [
+  { id: 'carousel', name: 'Carrossel educativo', selected: true },
+  { id: 'direct-offer', name: 'Oferta direta' },
+  { id: 'story-poll', name: 'Story de enquete' },
+  { id: 'reel-cover', name: 'Capa de Reel' },
+];
 
-  useEffect(() => {
-    loadBriefs();
-    loadCampaigns();
-    loadMedia();
-  }, [accountId]);
-
-  const loadBriefs = async () => {
-    try {
-      const res = await fetch(`/api/content/briefs?account_id=${accountId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setBriefs(Array.isArray(data.data) ? data.data : []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar briefs:', error);
-    }
-  };
-
-  const loadCampaigns = async () => {
-    try {
-      const res = await fetch(`/api/campaigns?account_id=${accountId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCampaigns(Array.isArray(data.data) ? data.data : []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar campanhas:', error);
-    }
-  };
-
-  const loadMedia = async () => {
-    try {
-      const res = await fetch(`/api/media/upload?account_id=${accountId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMediaItems(Array.isArray(data.data) ? data.data : []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar mídia:', error);
-    }
-  };
+export default function ConteudoPage() {
+  const [selectedTemplate, setSelectedTemplate] = useState('carousel');
+  const [currentSlide, setCurrentSlide] = useState(1);
+  const [totalSlides] = useState(7);
+  const [iaSuggestion, setIaSuggestion] = useState({
+    objetivo: 'Gerar leads',
+    tom: 'Direto e humano',
+    cta: 'Comente LINK',
+    formato: 'Carrossel',
+    agendar: '05 set · 10:30',
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <>
+      <PageHeader
+        tag="ESTÚDIO DE CONTEÚDO"
+        title="Estúdio de Conteúdo"
+        subtitle="Crie, revise e publique sem sair do fluxo."
+        actions={
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button style={{ backgroundColor: 'transparent', border: '1px solid #0E2A2E', color: '#0E2A2E', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
+              Salvar rascunho
+            </button>
+            <button style={{ backgroundColor: '#D6F24B', color: '#0E2A2E', padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
+              Gerar com IA
+            </button>
+          </div>
+        }
+      />
+
+      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '240px 1fr 280px', gap: '2rem' }}>
+        {/* Modelos (Esquerda) */}
         <div>
-          <h1 className="text-3xl font-bold text-white">Conteúdo</h1>
-          <p className="text-slate-400 mt-1">Crie, aprove e publique posts para Instagram</p>
-        </div>
-      </div>
-
-      <div className="flex gap-2 border-b border-slate-700">
-        {[
-          { id: 'estudio', label: '✨ Estúdio', icon: '🎬' },
-          { id: 'aprovacao', label: '✓ Aprovação', icon: '🔍' },
-          { id: 'calendario', label: '📅 Calendário', icon: '📆' },
-          { id: 'biblioteca', label: '📸 Biblioteca', icon: '🖼️' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as TabType)}
-            className={`px-4 py-3 font-medium border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-slate-400 hover:text-white'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'estudio' && <StudioTab accountId={accountId} onBriefCreated={loadBriefs} />}
-      {activeTab === 'aprovacao' && <ApprovalTab briefs={briefs} onBriefUpdated={loadBriefs} />}
-      {activeTab === 'calendario' && <CalendarTab briefs={briefs} campaigns={campaigns} />}
-      {activeTab === 'biblioteca' && <LibraryTab accountId={accountId} mediaItems={mediaItems} onMediaUploaded={loadMedia} />}
-    </div>
-  );
-}
-
-function StudioTab({ accountId, onBriefCreated }: { accountId: string; onBriefCreated: () => void }) {
-  const [theme, setTheme] = useState('');
-  const [type, setType] = useState<ContentType>(ContentType.FEED);
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
-
-  const handleGenerate = async () => {
-    if (!theme) return;
-    setGenerating(true);
-    try {
-      const res = await fetch('/api/content/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, theme, account_id: accountId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGenerated(data.data);
-      }
-    } catch (error) {
-      console.error('Erro ao gerar conteúdo:', error);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!generated) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/content/briefs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account_id: accountId,
-          type,
-          theme,
-          caption: generated.caption,
-          hashtags: generated.hashtags,
-          created_by: 'user',
-        }),
-      });
-      if (res.ok) {
-        setTheme('');
-        setGenerated(null);
-        onBriefCreated();
-      }
-    } catch (error) {
-      console.error('Erro ao salvar brief:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6 space-y-4">
-        <h2 className="text-xl font-bold text-white">Gerar conteúdo com IA</h2>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm text-slate-300 mb-2">Tipo</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as ContentType)}
-              className="w-full bg-slate-700 text-white rounded px-3 py-2 border border-slate-600"
-            >
-              <option value={ContentType.FEED}>Feed</option>
-              <option value={ContentType.REEL}>Reel</option>
-              <option value={ContentType.STORY}>Story</option>
-              <option value={ContentType.CAROUSEL}>Carrossel</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-300 mb-2">Tema</label>
-            <input
-              type="text"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              placeholder="Ex: Dicas de IA para negócios"
-              className="w-full bg-slate-700 text-white rounded px-3 py-2 border border-slate-600"
-            />
-          </div>
-        </div>
-
-        <button
-          onClick={handleGenerate}
-          disabled={!theme || generating}
-          className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-        >
-          {generating ? 'Gerando...' : 'Gerar conteúdo'}
-        </button>
-      </div>
-
-      {generated && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6 space-y-4">
-          <h2 className="text-xl font-bold text-white">Preview</h2>
-
-          <div className="space-y-3">
-            {generated.idea && (
-              <div>
-                <p className="text-sm text-slate-400">Ideia</p>
-                <p className="text-white">{generated.idea}</p>
-              </div>
-            )}
-            {generated.roteiro && (
-              <div>
-                <p className="text-sm text-slate-400">Roteiro</p>
-                <p className="text-white">{generated.roteiro}</p>
-              </div>
-            )}
-            {generated.caption && (
-              <div>
-                <p className="text-sm text-slate-400">Legenda</p>
-                <p className="text-white">{generated.caption}</p>
-              </div>
-            )}
-            {generated.hashtags?.length > 0 && (
-              <div>
-                <p className="text-sm text-slate-400">Hashtags</p>
-                <p className="text-white">{generated.hashtags.join(' ')}</p>
-              </div>
-            )}
-            {generated.cta && (
-              <div>
-                <p className="text-sm text-slate-400">CTA</p>
-                <p className="text-white">{generated.cta}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              {saving ? 'Salvando...' : 'Salvar como rascunho'}
-            </button>
-            <button
-              onClick={() => setGenerated(null)}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Descartar
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ApprovalTab({ briefs, onBriefUpdated }: { briefs: any[]; onBriefUpdated: () => void }) {
-  const pendingBriefs = briefs.filter((b) => b.status === ContentStatus.PENDING_APPROVAL || b.status === 'draft');
-
-  const handleApprove = async (briefId: string) => {
-    try {
-      const res = await fetch(`/api/content/briefs/${briefId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'approved' }),
-      });
-      if (res.ok) {
-        onBriefUpdated();
-      }
-    } catch (error) {
-      console.error('Erro ao aprovar:', error);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {pendingBriefs.length === 0 ? (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-8 text-center">
-          <p className="text-slate-400">Nenhum brief aguardando aprovação</p>
-        </div>
-      ) : (
-        pendingBriefs.map((brief) => (
-          <div key={brief.id} className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6 space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-white text-lg">{brief.theme}</h3>
-                <p className="text-slate-400 text-sm mt-1">{brief.type}</p>
-              </div>
-              <span className="text-xs bg-yellow-600 text-white px-2 py-1 rounded">
-                {brief.status}
-              </span>
-            </div>
-            <p className="text-white">{brief.caption}</p>
-            {brief.hashtags?.length > 0 && (
-              <p className="text-cyan-400 text-sm">{brief.hashtags.join(' ')}</p>
-            )}
-            <button
-              onClick={() => handleApprove(brief.id)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              ✓ Aprovar
-            </button>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-function CalendarTab({ briefs, campaigns }: { briefs: any[]; campaigns: any[] }) {
-  const scheduledBriefs = briefs
-    .filter((b) => b.scheduled_at && b.status !== ContentStatus.DRAFT)
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-
-  return (
-    <div className="space-y-4">
-      {campaigns.length > 0 && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-4">
-          <h3 className="font-bold text-white mb-2">Campanhas</h3>
-          <div className="space-y-2">
-            {campaigns.map((camp) => (
-              <div key={camp.id} className="text-sm text-slate-300">
-                📍 {camp.nome} ({new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()})
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '1rem', margin: 0 }}>
+            Modelos
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                onClick={() => setSelectedTemplate(template.id)}
+                style={{
+                  backgroundColor: selectedTemplate === template.id ? '#D6F24B' : '#FFFFFF',
+                  border: selectedTemplate === template.id ? '2px solid #D6F24B' : '1px solid #E2E2DE',
+                  padding: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 200ms ease',
+                  position: 'relative',
+                }}
+              >
+                <div style={{ width: '100%', height: '80px', backgroundColor: selectedTemplate === template.id ? '#0E2A2E' : '#E2E2DE', marginBottom: '0.75rem', borderRadius: 0 }} />
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: selectedTemplate === template.id ? '#0E2A2E' : '#0E2A2E' }}>
+                  {template.name}
+                </p>
+                {selectedTemplate === template.id && (
+                  <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', width: '20px', height: '20px', backgroundColor: '#0E2A2E', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D6F24B', fontWeight: 700 }}>
+                    ✓
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
-      )}
 
-      <div className="space-y-2">
-        {scheduledBriefs.length === 0 ? (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-8 text-center">
-            <p className="text-slate-400">Nenhum conteúdo agendado</p>
-          </div>
-        ) : (
-          scheduledBriefs.map((brief) => (
-            <div key={brief.id} className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-4 flex justify-between items-center">
+        {/* Canvas Central */}
+        <div>
+          <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid #E2E2DE' }}>
               <div>
-                <p className="font-bold text-white">{brief.theme}</p>
-                <p className="text-slate-400 text-sm">{new Date(brief.scheduled_at).toLocaleString()}</p>
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#7A8B84' }}>
+                  {templates.find((t) => t.id === selectedTemplate)?.name}
+                </p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#7A8B84' }}>
+                  1080 × 1350
+                </p>
               </div>
-              <span className="text-xs bg-slate-700 text-slate-200 px-2 py-1 rounded">
-                {brief.status}
+              <button style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.25rem' }}>
+                ⛶
+              </button>
+            </div>
+
+            {/* Preview área */}
+            <div style={{ flex: 1, backgroundColor: '#0E2A2E', borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+              <div style={{ textAlign: 'center', color: '#FAFAF8' }}>
+                <p style={{ fontFamily: archivo.style.fontFamily, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 1rem 0' }}>
+                  Seu conteúdo<br />precisa virar<br />conversa.
+                </p>
+                <div style={{ width: '60px', height: '20px', backgroundColor: '#D6F24B', margin: '1rem auto' }} />
+              </div>
+            </div>
+
+            {/* Paginação */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #E2E2DE' }}>
+              <button style={{ backgroundColor: 'transparent', border: '1px solid #E2E2DE', padding: '0.5rem 1rem', cursor: 'pointer' }}>
+                ← Anterior
+              </button>
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#7A8B84' }}>
+                {currentSlide} / {totalSlides}
               </span>
+              <button style={{ backgroundColor: 'transparent', border: '1px solid #E2E2DE', padding: '0.5rem 1rem', cursor: 'pointer' }}>
+                Próximo →
+              </button>
             </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LibraryTab({ accountId, mediaItems, onMediaUploaded }: { accountId: string; mediaItems: any[]; onMediaUploaded: () => void }) {
-  const [uploading, setUploading] = useState(false);
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('account_id', accountId);
-
-    setUploading(true);
-    try {
-      const res = await fetch('/api/media/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res.ok) {
-        onMediaUploaded();
-      }
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6 border-dashed">
-        <label className="flex flex-col items-center justify-center cursor-pointer">
-          <div className="text-3xl mb-2">📸</div>
-          <p className="text-slate-300 font-medium">Clique para fazer upload</p>
-          <p className="text-slate-500 text-sm">ou arraste imagens/vídeos</p>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            onChange={handleUpload}
-            disabled={uploading}
-            className="hidden"
-          />
-        </label>
-      </div>
-
-      {mediaItems.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          {mediaItems.map((media) => (
-            <div key={media.id} className="bg-slate-700 rounded-lg overflow-hidden">
-              {media.tipo === 'video' ? (
-                <div className="w-full h-32 bg-slate-800 flex items-center justify-center">🎬 {media.nome}</div>
-              ) : (
-                <img src={media.url} alt={media.nome} className="w-full h-32 object-cover" />
-              )}
-              <div className="p-2">
-                <p className="text-xs text-slate-300 truncate">{media.nome}</p>
-              </div>
-            </div>
-          ))}
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* IA sugere (Direita) */}
+        <div>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '1rem', margin: 0 }}>
+            IA sugere
+          </h3>
+          <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', padding: '1rem', borderRadius: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '0.5rem' }}>
+                Objetivo
+              </label>
+              <select style={{ width: '100%', padding: '0.5rem', border: '1px solid #E2E2DE', borderRadius: 0, fontSize: '0.875rem', backgroundColor: '#FAFAF8', color: '#0E2A2E' }}>
+                <option>{iaSuggestion.objetivo}</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '0.5rem' }}>
+                Tom
+              </label>
+              <select style={{ width: '100%', padding: '0.5rem', border: '1px solid #E2E2DE', borderRadius: 0, fontSize: '0.875rem', backgroundColor: '#FAFAF8', color: '#0E2A2E' }}>
+                <option>{iaSuggestion.tom}</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '0.5rem' }}>
+                CTA
+              </label>
+              <input
+                type="text"
+                defaultValue={iaSuggestion.cta}
+                style={{ width: '100%', padding: '0.5rem', border: '1px solid #E2E2DE', borderRadius: 0, fontSize: '0.875rem', backgroundColor: '#FAFAF8', color: '#0E2A2E', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '0.5rem' }}>
+                Formato
+              </label>
+              <select style={{ width: '100%', padding: '0.5rem', border: '1px solid #E2E2DE', borderRadius: 0, fontSize: '0.875rem', backgroundColor: '#FAFAF8', color: '#0E2A2E' }}>
+                <option>{iaSuggestion.formato}</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '0.5rem' }}>
+                Agendar
+              </label>
+              <input
+                type="text"
+                defaultValue={iaSuggestion.agendar}
+                style={{ width: '100%', padding: '0.5rem', border: '1px solid #E2E2DE', borderRadius: 0, fontSize: '0.875rem', backgroundColor: '#FAFAF8', color: '#0E2A2E', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '1rem', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', textAlign: 'center', padding: '1rem', border: '1px solid #E2E2DE', backgroundColor: '#FFFFFF', borderRadius: 0 }}>
+            Pronto para revisão
+          </div>
+        </div>
+      </main>
+    </>
   );
 }
