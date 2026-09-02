@@ -5,6 +5,7 @@ import { downloadMediaToStorage } from '@/lib/storage';
 import { ApiResponse } from '@/types';
 import { processarComentario, processarStoryReply, type CommentPayload, type StoryReplyPayload } from '@/lib/instagram';
 import { autoResponder } from '@/lib/agente';
+import { matchFlows, getFlow, getOrCreateFlowRun, executeRun } from '@/lib/flowEngine';
 
 // POST - Webhook de Zernio (message.received, conversation.started, comment.received)
 export async function POST(req: NextRequest) {
@@ -63,6 +64,32 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, data: { skipped: true, reason: 'reply_in_thread' } } as ApiResponse<any>);
       }
 
+      // C4: Procurar fluxos que casem com este comentário
+      const matchedFlows = await matchFlows('comment', parsed.texto, parsed.media_id);
+      if (matchedFlows && matchedFlows.length > 0) {
+        console.log(`🎯 ${matchedFlows.length} fluxo(s) casa(m) com comentário:`, parsed.comment_id);
+
+        // Para cada fluxo que casou, iniciar um run
+        for (const flow of matchedFlows) {
+          try {
+            const run = await getOrCreateFlowRun(
+              flow.id,
+              parsed.remetente_id || 'unknown',
+              parsed.comment_id || 'unknown'
+            );
+
+            if (run) {
+              const result = await executeRun(run, flow);
+              console.log(`✅ Fluxo ${flow.id} iniciado para comentário ${parsed.comment_id}`);
+            }
+          } catch (err) {
+            console.error(`❌ Erro ao iniciar fluxo ${flow.id}:`, err);
+          }
+        }
+
+        // Depois de disparar fluxo(s), ainda processa a automação simples
+      }
+
       const comentario: CommentPayload = {
         comment_id: parsed.comment_id || '',
         media_id: parsed.media_id || '',
@@ -80,6 +107,56 @@ export async function POST(req: NextRequest) {
 
     // 4. Se mensagem ou conversa iniciada, processar inbox
     if (parsed.tipo === 'message.received' || parsed.tipo === 'conversation.started') {
+      // C4: Se é story_reply, procurar fluxos antes de ingerir
+      if (parsed.is_story_reply) {
+        const matchedFlows = await matchFlows('story_reply', parsed.texto, parsed.story_id);
+        if (matchedFlows && matchedFlows.length > 0) {
+          console.log(`🎯 ${matchedFlows.length} fluxo(s) casa(m) com story reply:`, parsed.story_id);
+
+          for (const flow of matchedFlows) {
+            try {
+              const run = await getOrCreateFlowRun(
+                flow.id,
+                parsed.remetente_id || 'unknown',
+                parsed.conversation_id
+              );
+
+              if (run) {
+                const result = await executeRun(run, flow);
+                console.log(`✅ Fluxo ${flow.id} iniciado para story reply ${parsed.story_id}`);
+              }
+            } catch (err) {
+              console.error(`❌ Erro ao iniciar fluxo ${flow.id}:`, err);
+            }
+          }
+        }
+      }
+
+      // C4: Se é DM direto (não story), procurar fluxos também
+      if (!parsed.is_story_reply) {
+        const matchedFlows = await matchFlows('dm', parsed.texto);
+        if (matchedFlows && matchedFlows.length > 0) {
+          console.log(`🎯 ${matchedFlows.length} fluxo(s) casa(m) com DM:`, parsed.conversation_id);
+
+          for (const flow of matchedFlows) {
+            try {
+              const run = await getOrCreateFlowRun(
+                flow.id,
+                parsed.remetente_id || 'unknown',
+                parsed.conversation_id
+              );
+
+              if (run) {
+                const result = await executeRun(run, flow);
+                console.log(`✅ Fluxo ${flow.id} iniciado para DM ${parsed.conversation_id}`);
+              }
+            } catch (err) {
+              console.error(`❌ Erro ao iniciar fluxo ${flow.id}:`, err);
+            }
+          }
+        }
+      }
+
       await ingerirMensagem(parsed);
       return NextResponse.json({ success: true, data: { ingested: true } } as ApiResponse<any>);
     }
