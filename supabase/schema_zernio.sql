@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS zernio_accounts (
   platform TEXT NOT NULL CHECK (platform IN ('instagram', 'whatsapp', 'facebook')),
   username TEXT NOT NULL,
   display_name TEXT,
-  platform_user_id TEXT COMMENT 'ID numérico da conta IG Business',
+  platform_user_id TEXT,
   followers_count INT DEFAULT 0,
   profile_picture_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS zernio_conversations (
   id BIGSERIAL PRIMARY KEY,
   zernio_conversa TEXT NOT NULL,
   zernio_account TEXT NOT NULL REFERENCES zernio_accounts(account_id) ON DELETE CASCADE,
-  account_id TEXT COMMENT 'account_id da conversa (pode diferir)',
+  account_id TEXT,
   participant_id TEXT,
   participant_username TEXT NOT NULL,
   participant_name TEXT,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS zernio_conversations (
 CREATE TABLE IF NOT EXISTS zernio_messages (
   id BIGSERIAL PRIMARY KEY,
   conversation_id BIGINT NOT NULL REFERENCES zernio_conversations(id) ON DELETE CASCADE,
-  id_externo TEXT NOT NULL COMMENT 'message_id do Zernio (dedupe)',
+  id_externo TEXT NOT NULL,
   autor TEXT,
   direcao TEXT NOT NULL CHECK (direcao IN ('in', 'out', 'interna')),
   content TEXT,
@@ -57,7 +57,16 @@ CREATE INDEX IF NOT EXISTS idx_zernio_conversations_participant ON zernio_conver
 CREATE INDEX IF NOT EXISTS idx_zernio_messages_conversation ON zernio_messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_zernio_messages_created ON zernio_messages(created_at DESC);
 
--- Tabela de eventos de auditoria (já pode existir)
+-- Tabela de eventos de auditoria (cria se não existir)
+CREATE TABLE IF NOT EXISTS crm_eventos (
+  id BIGSERIAL PRIMARY KEY,
+  tipo TEXT,
+  canal TEXT,
+  origem TEXT,
+  lead_id BIGINT,
+  conversa_id BIGINT,
+  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ALTER TABLE crm_eventos ADD COLUMN IF NOT EXISTS payload JSONB;
 ALTER TABLE crm_eventos ADD COLUMN IF NOT EXISTS ator TEXT;
 
@@ -65,7 +74,7 @@ ALTER TABLE crm_eventos ADD COLUMN IF NOT EXISTS ator TEXT;
 CREATE TABLE IF NOT EXISTS instagram_media (
   id BIGSERIAL PRIMARY KEY,
   external_media_id TEXT UNIQUE,
-  tipo TEXT COMMENT 'image, video, carousel, story',
+  tipo TEXT,
   permalink TEXT,
   caption TEXT,
   thumbnail_url TEXT,
@@ -119,11 +128,11 @@ CREATE TABLE IF NOT EXISTS ig_automacoes (
   nome TEXT NOT NULL,
   formato TEXT DEFAULT 'qualquer' CHECK (formato IN ('qualquer', 'post', 'reels', 'stories')),
   onde TEXT DEFAULT 'comentario' CHECK (onde IN ('comentario', 'dm', 'story_reply')),
-  gatilho TEXT COMMENT 'palavras-chave separadas por vírgula',
-  resposta_comentario TEXT COMMENT 'resposta pública',
-  resposta_dm TEXT COMMENT 'resposta em DM',
+  gatilho TEXT,
+  resposta_comentario TEXT,
+  resposta_dm TEXT,
   ativo BOOLEAN DEFAULT FALSE,
-  media_id TEXT COMMENT 'post/story específico (NULL = qualquer)',
+  media_id TEXT,
   disparos INT DEFAULT 0,
   leads_criados INT DEFAULT 0,
   match_tipo TEXT DEFAULT 'contem' CHECK (match_tipo IN ('contem', 'exata', 'comeca')),
@@ -171,11 +180,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_zernio_conversations_updated_at ON zernio_conversations;
 CREATE TRIGGER update_zernio_conversations_updated_at
 BEFORE UPDATE ON zernio_conversations
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_zernio_messages_updated_at ON zernio_messages;
 CREATE TRIGGER update_zernio_messages_updated_at
 BEFORE UPDATE ON zernio_messages
 FOR EACH ROW
