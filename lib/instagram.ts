@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/db';
 import { zernio } from '@/lib/zernio';
+import { enqueue } from '@/lib/sendQueue';
 
 // ============================================================
 // 6.3 CORRESPONDÊNCIA (_ig_automacao_match)
@@ -174,17 +175,31 @@ export async function processarComentario(payload: CommentPayload) {
         continue;
       }
 
-      // 3b. Resposta pública no comentário
+      // 3b. Resposta pública no comentário (via fila se delay, senão imediato)
       if (auto.resposta_comentario) {
-        await zernio.replyComment(
-          payload.comment_id,
-          payload.account_id,
-          auto.resposta_comentario
-        );
-        console.log('✅ Resposta pública enviada ao comentário:', payload.comment_id);
+        if (auto.delay_seg > 0) {
+          const dedupeKey = `comment_reply_${payload.comment_id}`;
+          const not_before = new Date(Date.now() + auto.delay_seg * 1000);
+          await enqueue({
+            account_id: payload.account_id,
+            kind: 'comment_reply',
+            comment_id: payload.comment_id,
+            message: auto.resposta_comentario,
+            dedupe_key: dedupeKey,
+            not_before,
+          });
+          console.log('📅 Resposta ao comentário enfileirada (delay):', payload.comment_id);
+        } else {
+          await zernio.replyComment(
+            payload.comment_id,
+            payload.account_id,
+            auto.resposta_comentario
+          );
+          console.log('✅ Resposta pública enviada ao comentário:', payload.comment_id);
+        }
       }
 
-      // 3c. DM privada (resposta_dm + botões)
+      // 3c. DM privada (resposta_dm + botões) - via fila robusta
       if (auto.resposta_dm || auto.dm_media_url) {
         // Buscar botões da automação
         const { data: botoes } = await supabase
@@ -206,33 +221,23 @@ export async function processarComentario(payload: CommentPayload) {
           }
         }
 
-        // Se delay_seg > 0, adicionar à fila
-        if (auto.delay_seg > 0) {
-          const sendAt = new Date();
-          sendAt.setSeconds(sendAt.getSeconds() + auto.delay_seg);
+        // Enfileirar via nova fila robusta
+        const dedupeKey = `private_reply_${payload.comment_id}_${Date.now()}`;
+        const not_before = new Date(Date.now() + (auto.delay_seg || 0) * 1000);
 
-          await supabase.from('ig_pendentes').insert({
-            conversation_id: null, // Para comentário, não tem conversa
-            lead_id: lead?.id,
-            texto: dmTexto,
-            media_url: auto.dm_media_url,
-            send_at: sendAt.toISOString(),
-            enviado: false,
-            automacao_id: auto.id,
-            comment_id: payload.comment_id,
-            created_at: new Date(),
-          });
+        await enqueue({
+          account_id: payload.account_id,
+          kind: 'private_reply',
+          contact_id: lead?.id?.toString(),
+          comment_id: payload.comment_id,
+          message: dmTexto,
+          media_url: auto.dm_media_url,
+          media_type: 'image', // Assume imagem, poder ser detectado
+          dedupe_key: dedupeKey,
+          not_before,
+        });
 
-          console.log('📅 DM agendado (delay):', payload.comment_id);
-        } else {
-          // Enviar imediatamente via privateReply
-          await zernio.privateReply(
-            payload.comment_id,
-            payload.account_id,
-            dmTexto
-          );
-          console.log('💬 DM privado enviado:', payload.comment_id);
-        }
+        console.log('📅 DM privado enfileirado:', payload.comment_id);
       }
 
       // 3d. Destino
