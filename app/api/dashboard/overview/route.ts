@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { getContentAccountId } from '@/lib/tenant';
 import { ApiResponse } from '@/types';
 
 interface OverviewData {
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     const { data: briefs, error: briefError } = await supabase
       .from('content_briefs')
       .select('id, scheduled_at, status')
-      .eq('account_id', accountId)
+      .eq('account_id', await getContentAccountId())
       .gte('scheduled_at', today.toISOString())
       .neq('status', 'draft')
       .neq('status', 'rejected');
