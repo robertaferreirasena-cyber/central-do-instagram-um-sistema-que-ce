@@ -21,6 +21,12 @@ export interface FlowStep {
   y?: number;
 }
 
+export interface FlowEdge {
+  from: string;
+  handle: string;
+  to: string;
+}
+
 export interface Flow {
   id: number;
   nome: string;
@@ -29,6 +35,7 @@ export interface Flow {
   trigger_value: string;
   match_mode: string;
   steps: FlowStep[];
+  edges?: FlowEdge[];
   post_ig_id: string;
   priority: number;
   enabled: boolean;
@@ -105,6 +112,16 @@ export async function getOrCreateFlowRun(
   return (newRun as FlowRun) || null;
 }
 
+function proximoNo(edges: FlowEdge[] | undefined, fromId: string, handle: string = 'next'): string | null {
+  if (!edges || edges.length === 0) return null;
+  const edge = edges.find(e => e.from === fromId && e.handle === handle);
+  return edge ? edge.to : null;
+}
+
+function findStepIndexById(steps: FlowStep[], stepId: string): number {
+  return steps.findIndex(s => s.id === stepId);
+}
+
 export async function executeRun(run: FlowRun, flow: Flow): Promise<{
   run: FlowRun;
   actions: any[];
@@ -117,36 +134,45 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
     return { run, actions };
   }
 
+  // Detecta se o fluxo usa edges (DirectPro) ou índice (U1)
+  const hasEdges = flow.edges && flow.edges.length > 0;
+
   let currentStepIndex = run.current_step;
   let newRun = { ...run };
   let isRunning = true;
+  let stepsExecuted = 0;
+  const maxSteps = 1000;
 
-  while (isRunning && currentStepIndex < flow.steps.length) {
+  while (isRunning && stepsExecuted < maxSteps && currentStepIndex < flow.steps.length) {
+    stepsExecuted++;
+
     const step = flow.steps[currentStepIndex];
     const stepLog = { step: step.id, type: step.type, timestamp: new Date().toISOString() };
 
-    // Log da jornada
     if (!context._journey) context._journey = [];
     context._journey.push(stepLog);
 
+    let nextStepIndex: number | null = null;
+
     switch (step.type) {
       case 'text':
-        // Interpola variáveis {{nome}} etc
         const interpolatedText = interpolate(step.content || '', context);
         actions.push({
           type: 'send_message',
           text: interpolatedText,
           is_private: false,
         });
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         break;
 
       case 'quick_replies':
-        // Para, aguarda resposta (status = waiting)
         actions.push({
           type: 'send_message',
           text: step.content || '',
-          quick_replies: step.buttons || [],
+          quick_replies: (step.buttons || []).map((btn, i) => ({
+            label: btn.label,
+            postback: hasEdges ? `FLOW:${flow.id}:${step.id}:${i}` : btn.label,
+          })),
           is_private: true,
         });
         newRun.status = 'waiting';
@@ -161,7 +187,7 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
           media_type: step.media_type || 'image',
           caption: step.content,
         });
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         break;
 
       case 'collect_data':
@@ -177,14 +203,13 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
         break;
 
       case 'condition':
-        // Verifica se a condição é verdadeira baseado no context
         const conditionMet = checkCondition(context, step);
-        const nextStepId = conditionMet ? step.yes_target : step.no_target;
-        const nextIdx = flow.steps.findIndex(s => s.id === nextStepId);
-        if (nextIdx !== -1) {
-          currentStepIndex = nextIdx;
+        if (hasEdges) {
+          nextStepIndex = -1;
         } else {
-          currentStepIndex++;
+          const targetStepId = conditionMet ? step.yes_target : step.no_target;
+          const targetIdx = flow.steps.findIndex(s => s.id === targetStepId);
+          nextStepIndex = targetIdx !== -1 ? targetIdx : currentStepIndex + 1;
         }
         break;
 
@@ -193,11 +218,10 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
           type: 'wait',
           delay_seconds: step.delay_seconds || 5,
         });
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         break;
 
       case 'notify_admin':
-        // HANDOFF: passa pro agente mas não ativa (agente OFF)
         actions.push({
           type: 'notify_admin',
           message: 'Fluxo atingiu handoff',
@@ -217,19 +241,15 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
         break;
 
       case 'start':
-        // Start é um nó inicializador, apenas avança
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         break;
 
       case 'follow_gate':
-        // Portão de seguidor com degradação graciosa (null = libera, max 5 lembretes/dia)
         const followsAccount = context._follows_account;
 
         if (followsAccount === null || followsAccount === undefined) {
-          // Meta não informou segue? status: Libera e registra
           console.log('ℹ️ Follow status null, liberando (degradação graciosa):', newRun.id);
 
-          // Log em Atividade
           await supabase
             .from('crm_eventos')
             .insert({
@@ -243,54 +263,62 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
             })
             .catch((err: any) => console.warn('⚠️ Erro ao registrar evento de degradação:', err));
 
-          // Avança sem parar
-          currentStepIndex++;
+          nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
           break;
         }
 
-        // Se segue? Avança; senão, oferece reminder
         if (followsAccount === true) {
-          currentStepIndex++;
+          nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         } else if (followsAccount === false) {
-          // Não segue: oferece reminder (máx 5/dia)
           const contactId = context._contact_id || '';
           if (contactId && canSendFollowReminder(contactId)) {
             actions.push({
               type: 'send_message',
               text: step.content || 'Siga-nos para continuar',
-              quick_replies: step.buttons || [],
+              quick_replies: [{
+                label: step.buttons?.[0]?.label || 'Confirmar',
+                postback: hasEdges ? `FLOWGATE:${flow.id}:${step.id}` : 'confirmed'
+              }],
               is_private: true,
             });
             newRun.status = 'waiting';
             newRun.current_step = currentStepIndex;
             isRunning = false;
           } else {
-            // Limite de lembretes atingido: salta para o próximo passo
             console.log('⏭️ Limite de lembretes de follow atingido, continuando:', contactId);
-            currentStepIndex++;
+            nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
           }
         } else {
-          // Status desconhecido (booleano inválido): libera com cautela
-          currentStepIndex++;
+          nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         }
         break;
 
       case 'tag':
-        // Aplica etiqueta ao lead
         actions.push({
           type: 'apply_tag',
           tag: step.tag_to_apply || '',
         });
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
         break;
 
       default:
-        currentStepIndex++;
+        nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
+    }
+
+    // Se usa edges e chegou em -1, resol ve por edge
+    if (hasEdges && nextStepIndex === -1) {
+      const nextStepId = proximoNo(flow.edges, step.id, 'next');
+      currentStepIndex = nextStepId ? findStepIndexById(flow.steps, nextStepId) : flow.steps.length;
+      if (currentStepIndex === -1) {
+        newRun.status = 'completed';
+        isRunning = false;
+      }
+    } else {
+      currentStepIndex = nextStepIndex ?? flow.steps.length;
     }
   }
 
-  // Se saiu do loop sem pausar, marca como completed
-  if (isRunning || currentStepIndex >= flow.steps.length) {
+  if (isRunning) {
     newRun.status = 'completed';
   }
 
@@ -298,7 +326,6 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
   newRun.context = context;
   newRun.atualizado_em = new Date().toISOString();
 
-  // Salva o run no banco
   await dbQuery(() =>
     supabase
       .from('flow_runs')
@@ -324,59 +351,95 @@ export async function resumeFlowFromButton(
   const flow = await getFlow(run.flow_id);
   if (!flow) return null;
 
-  const currentStep = flow.steps[run.current_step];
-  if (!currentStep) return null;
-
   if (!run.context) run.context = { _journey: [] };
 
-  // C2: Validação de e-mail se step anterior é collect_data com field_name='email'
-  if (currentStep.type === 'collect_data' && currentStep.field_name === 'email') {
-    const email = extractEmail(buttonValue);
-    if (!email || !isValidEmail(email)) {
-      // E-mail inválido: reenvia UMA vez o pedido
-      const retryCount = (run.context._email_retry_count || 0);
-      if (retryCount < 1) {
-        // Primeira tentativa falhou: reenvia pedido
-        run.context._email_retry_count = retryCount + 1;
-        run.status = 'waiting';
-        // Salva contexto
-        await dbQuery(() =>
-          supabase
-            .from('flow_runs')
-            .update({ context: run.context, atualizado_em: new Date().toISOString() })
-            .eq('id', run.id)
-        );
-        // Retorna ação de reenvio
-        return {
-          run,
-          actions: [
-            {
-              type: 'send_message',
-              text: 'Acho que esse e-mail saiu errado, me manda só o e-mail',
-              is_private: true,
-            },
-          ],
-        };
+  // D4: Parse FLOW:{flowId}:{stepId}:{buttonIndex} ou FLOWGATE:{flowId}:{stepId}
+  let targetStepId: string | null = null;
+  let buttonHandle: string | null = null;
+
+  if (buttonValue.startsWith('FLOW:')) {
+    const parts = buttonValue.split(':');
+    if (parts.length === 4) {
+      const [, parsedFlowId, parsedStepId, parsedBtnIdx] = parts;
+      if (parseInt(parsedFlowId) === flow.id) {
+        targetStepId = parsedStepId;
+        buttonHandle = `btn:${parsedBtnIdx}`;
       }
-      // Se já tentou uma vez, ignora e avança mesmo assim
     }
-    // E-mail válido: salva no context e avança
-    if (email) {
-      run.context[currentStep.field_name] = email;
+  } else if (buttonValue.startsWith('FLOWGATE:')) {
+    const parts = buttonValue.split(':');
+    if (parts.length === 3) {
+      const [, parsedFlowId, parsedStepId] = parts;
+      if (parseInt(parsedFlowId) === flow.id) {
+        // Reconfere o portão no MESMO step (não avança)
+        targetStepId = parsedStepId;
+        buttonHandle = null; // Stay on same step to recheck gate
+      }
     }
   } else {
-    // Para outros tipos de collect_data ou steps, salva normalmente
-    if (currentStep.type === 'collect_data' && currentStep.field_name) {
+    // Fallback: tratamento de legado (buttonValue simples)
+    const currentStep = flow.steps[run.current_step];
+    if (!currentStep) return null;
+
+    if (currentStep.type === 'collect_data' && currentStep.field_name === 'email') {
+      const email = extractEmail(buttonValue);
+      if (!email || !isValidEmail(email)) {
+        const retryCount = (run.context._email_retry_count || 0);
+        if (retryCount < 1) {
+          run.context._email_retry_count = retryCount + 1;
+          run.status = 'waiting';
+          await dbQuery(() =>
+            supabase
+              .from('flow_runs')
+              .update({ context: run.context, atualizado_em: new Date().toISOString() })
+              .eq('id', run.id)
+          );
+          return {
+            run,
+            actions: [
+              {
+                type: 'send_message',
+                text: 'Acho que esse e-mail saiu errado, me manda só o e-mail',
+                is_private: true,
+              },
+            ],
+          };
+        }
+      }
+      if (email) {
+        run.context[currentStep.field_name] = email;
+      }
+      // Segue por 'next' handle
+      targetStepId = proximoNo(flow.edges, currentStep.id, 'next');
+    } else if (currentStep.type === 'collect_data' && currentStep.field_name) {
       run.context[currentStep.field_name] = buttonValue;
+      targetStepId = proximoNo(flow.edges, currentStep.id, 'next');
+    } else {
+      // Fallback para compatibilidade: simplesmente avança de índice
+      run.current_step += 1;
+      run.status = 'running';
+      return executeRun(run, flow);
     }
   }
 
-  // Registra o botão clicado no context
+  // D3/D4: Se temos um handle (btn:X), segue a edge correspondente
+  if (buttonHandle && targetStepId) {
+    const nextId = proximoNo(flow.edges, targetStepId, buttonHandle);
+    if (nextId) {
+      targetStepId = nextId;
+    }
+  }
+
+  // Atualiza o step atual para o destino
+  if (targetStepId) {
+    const targetIdx = findStepIndexById(flow.steps, targetStepId);
+    if (targetIdx !== -1) {
+      run.current_step = targetIdx;
+    }
+  }
+
   run.context.last_button_clicked = buttonValue;
   run.context.button_step = run.current_step;
-
-  // Avança para o próximo passo
-  run.current_step += 1;
   run.status = 'running';
 
   // Re-executa o fluxo
