@@ -29,14 +29,8 @@ export default function RootLayout({
       </head>
       <body className={instrumentSans.className} style={{ backgroundColor: '#0E2A2E', color: '#0E2A2E', margin: 0, padding: 0 }}>
         <style>{`
-          @media (min-width: 1024px) {
-            body > div {
-              display: flex;
-            }
-            [data-role="content"] {
-              margin-left: 280px;
-              flex: 1;
-            }
+          [data-role="content"] {
+            margin-left: 280px;
           }
           @media (max-width: 1023px) {
             [data-role="content"] {
@@ -45,9 +39,9 @@ export default function RootLayout({
             }
           }
         `}</style>
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <div style={{ minHeight: '100vh' }}>
           <Sidebar brandName={brandName} />
-          <div data-role="content" style={{ backgroundColor: '#FAFAF8', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          <div data-role="content" style={{ backgroundColor: '#FAFAF8', display: 'flex', flexDirection: 'column', minHeight: '100vh', width: 'auto' }}>
             {children}
           </div>
         </div>
