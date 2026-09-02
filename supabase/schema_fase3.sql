@@ -102,19 +102,19 @@ FOREIGN KEY (conversation_id) REFERENCES public.zernio_conversations(zernio_conv
 DEFERRABLE INITIALLY DEFERRED;
 
 -- Granulação de permissões (se usando RLS)
-ALTER TABLE public.ig_automacoes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ig_automacao_botoes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ig_pendentes ENABLE ROW LEVEL SECURITY;
+
+
+
 
 -- Permitir leitura/escrita pública (ajuste conforme necessário)
-CREATE POLICY IF NOT EXISTS "Enable read access for all users" ON public.ig_automacoes FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Enable insert for all users" ON public.ig_automacoes FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Enable update for all users" ON public.ig_automacoes FOR UPDATE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Enable read access for all users" ON public.ig_automacao_botoes FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Enable insert for all users" ON public.ig_automacao_botoes FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Enable update for all users" ON public.ig_automacao_botoes FOR UPDATE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Enable read access for all users" ON public.ig_pendentes FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Enable insert for all users" ON public.ig_pendentes FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Enable update for all users" ON public.ig_pendentes FOR UPDATE USING (true);
+
+
+
+
+
+
+
+
+
