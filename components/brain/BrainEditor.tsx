@@ -20,7 +20,9 @@ export default function BrainEditor({
   const [formData, setFormData] = useState(data || {});
 
   const handleSave = () => {
-    onUpdate(formData);
+    // Se formData é string, salva como string; se é objeto, salva como objeto
+    const dataToSave = typeof formData === 'string' ? formData : formData;
+    onUpdate(dataToSave);
     setEditingField(null);
   };
 
@@ -32,6 +34,25 @@ export default function BrainEditor({
   };
 
   const renderEditorContent = () => {
+    // Detectar se a seção é string (texto livre) e renderizar como textarea agnóstico
+    if (typeof formData === 'string' || (!formData && !editingField)) {
+      const stringValue = typeof formData === 'string' ? formData : '';
+      return (
+        <div className="bg-[#1a3f45] rounded p-4 border border-[#2a5f65]">
+          <h4 className="text-[#dce9f7] font-semibold mb-2">{section.replace(/_/g, ' ').toUpperCase()}</h4>
+          {editingField === 'main' ? (
+            <textarea
+              value={stringValue}
+              onChange={(e) => setFormData(e.target.value)}
+              className="w-full bg-[#070d18] text-[#dce9f7] px-3 py-2 rounded border border-[#3ddc84]/30 h-48 resize-none"
+            />
+          ) : (
+            <p className="text-[#a0b0c7] text-sm whitespace-pre-wrap">{stringValue || 'Não preenchido'}</p>
+          )}
+        </div>
+      );
+    }
+
     switch (section) {
       case 'empresa':
         return (
