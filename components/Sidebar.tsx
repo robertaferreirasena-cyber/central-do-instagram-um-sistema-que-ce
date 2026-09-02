@@ -33,11 +33,17 @@ export function Sidebar({ brandName }: SidebarProps) {
   return (
     <>
       <style>{`
-        @media (max-width: 899px) {
+        @media (max-width: 1023px) {
           aside {
+            position: fixed;
             transform: translateX(${isOpen ? '0' : '-280px'});
             transition: transform 300ms ease;
             z-index: 50;
+          }
+          .sidebar-toggle {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
           }
           .sidebar-backdrop {
             display: ${isOpen ? 'block' : 'none'};
@@ -47,9 +53,9 @@ export function Sidebar({ brandName }: SidebarProps) {
             z-index: 40;
           }
         }
-        @media (min-width: 900px) {
+        @media (min-width: 1024px) {
           .sidebar-toggle {
-            display: none;
+            display: none !important;
           }
           .sidebar-backdrop {
             display: none !important;
@@ -73,10 +79,11 @@ export function Sidebar({ brandName }: SidebarProps) {
           backgroundColor: '#0E2A2E',
           color: '#FAFAF8',
           border: '1px solid #1A3A40',
-          padding: '0.5rem',
+          padding: '0.5rem 0.6rem',
           cursor: 'pointer',
           fontSize: '1.25rem',
           display: 'none',
+          lineHeight: 1,
         }}
       >
         ☰
