@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import PlanejadorConteudo from '@/components/planejador-conteudo';
+import { TENANT_TEXT } from '@/lib/tenant';
 import { Archivo } from 'next/font/google';
 
 const archivo = Archivo({ subsets: ['latin'], weight: ['600', '800', '900'] });
@@ -46,7 +47,7 @@ export default function ConteudoPage() {
 
   const loadTemplates = async () => {
     try {
-      const res = await fetch('/api/content/templates?account_id=default-account');
+      const res = await fetch(`/api/content/templates?account_id=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         const temps = Array.isArray(data.data) ? data.data : [];
@@ -78,7 +79,7 @@ export default function ConteudoPage() {
         body: JSON.stringify({
           type: selectedTemplate,
           theme: tema,
-          account_id: 'default-account',
+          account_id: TENANT_TEXT,
         }),
       });
       const data = await res.json();
@@ -115,7 +116,7 @@ export default function ConteudoPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          account_id: 'default-account',
+          account_id: TENANT_TEXT,
           type: selectedTemplate,
           theme: tema,
           caption: generated.caption || '',
@@ -207,7 +208,7 @@ export default function ConteudoPage() {
         accountId="default-account"
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '240px 1fr 280px', gap: '2rem' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '240px 1fr 280px', gap: '2rem', width: '100%' }}>
         {/* Modelos (Esquerda) */}
         <div>
           <h3 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#7A8B84', marginBottom: '1rem', margin: 0 }}>
