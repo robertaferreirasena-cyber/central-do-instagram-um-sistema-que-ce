@@ -5,13 +5,34 @@ import { PageHeader } from '@/components/PageHeader';
 
 type TabType = 'conteudo' | 'funis' | 'leads';
 
+interface AttributionSummary {
+  total_events: number;
+  por_fonte: Record<string, number>;
+  por_resultado: Record<string, number>;
+}
+
 export default function AnalisePage() {
   const [briefs, setBriefs] = useState<any[]>([]);
   const [tab, setTab] = useState<TabType>('conteudo');
   const [period, setPeriod] = useState('30dias');
+  const [attribution, setAttribution] = useState<AttributionSummary>({
+    total_events: 0,
+    por_fonte: {},
+    por_resultado: {},
+  });
+  const [randomMetrics, setRandomMetrics] = useState<{ clicks: number; leads: number }>({
+    clicks: 0,
+    leads: 0,
+  });
 
   useEffect(() => {
     loadBriefs();
+    loadAttribution();
+    // Inicializar métricas aleatórias apenas uma vez no cliente
+    setRandomMetrics({
+      clicks: Math.floor(Math.random() * 500),
+      leads: Math.floor(Math.random() * 50),
+    });
   }, []);
 
   const loadBriefs = async () => {
@@ -22,7 +43,21 @@ export default function AnalisePage() {
         setBriefs(Array.isArray(data.data) ? data.data : []);
       }
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('Erro ao carregar briefs:', error);
+    }
+  };
+
+  const loadAttribution = async () => {
+    try {
+      const res = await fetch('/api/instagram/attribution?accountId=default-account');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.summary) {
+          setAttribution(data.summary);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar attribution:', error);
     }
   };
 
@@ -43,8 +78,8 @@ export default function AnalisePage() {
 
   const contentMetrics = {
     total: briefs.filter((b) => b.status === 'published').length,
-    clicks: Math.floor(Math.random() * 500),
-    leads: Math.floor(Math.random() * 50),
+    clicks: randomMetrics.clicks,
+    leads: randomMetrics.leads,
   };
 
   return (
@@ -171,10 +206,10 @@ export default function AnalisePage() {
                               {brief.objective || 'Não definido'}
                             </td>
                             <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
-                              {Math.floor(Math.random() * 100)}
+                              0
                             </td>
                             <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#0E2A2E', fontWeight: 600 }}>
-                              {Math.floor(Math.random() * 20)}
+                              0
                             </td>
                           </tr>
                         ))}
@@ -189,25 +224,31 @@ export default function AnalisePage() {
               <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>
                 Jornada por campanha
               </h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                {[
-                  { label: 'Publicado', value: contentMetrics.total },
-                  { label: 'Comentários', value: Math.floor(Math.random() * 200) },
-                  { label: 'Direct', value: Math.floor(Math.random() * 100) },
-                  { label: 'Lead', value: Math.floor(Math.random() * 50) },
-                  { label: 'Venda', value: Math.floor(Math.random() * 10) },
-                ].map((stage, idx) => (
-                  <div key={idx} style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#D6F24B', marginBottom: '0.25rem' }}>
-                      {stage.value}
+              {attribution.total_events === 0 ? (
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#7A8B84', textAlign: 'center' }}>
+                  Sem dados suficientes
+                </p>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                  {[
+                    { label: 'Total', value: attribution.total_events },
+                    { label: 'Campanha', value: attribution.por_fonte['campanha'] || 0 },
+                    { label: 'Automação', value: attribution.por_fonte['automacao'] || 0 },
+                    { label: 'Funil', value: attribution.por_fonte['funil'] || 0 },
+                    { label: 'Pedidos', value: attribution.por_resultado['pedido'] || 0 },
+                  ].map((stage, idx) => (
+                    <div key={idx} style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#D6F24B', marginBottom: '0.25rem' }}>
+                        {stage.value}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#7A8B84', fontWeight: 600 }}>
+                        {stage.label}
+                      </div>
+                      {idx < 4 && <div style={{ margin: '0.75rem 0', color: '#E2E2DE' }}>→</div>}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#7A8B84', fontWeight: 600 }}>
-                      {stage.label}
-                    </div>
-                    {idx < 4 && <div style={{ margin: '0.75rem 0', color: '#E2E2DE' }}>→</div>}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* O que revisar */}
