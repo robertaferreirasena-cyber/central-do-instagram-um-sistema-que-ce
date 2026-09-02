@@ -1,86 +1,54 @@
-import Link from 'next/link';
+import { HomeCard } from '@/components/HomeCard';
 
-const brandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'Social Central';
+const brandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'IA Club';
 const brandTagline = process.env.NEXT_PUBLIC_BRAND_TAGLINE || 'Conteúdo e atendimento do Instagram, num lugar só';
 
 export default function Home() {
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-2">{brandName}</h1>
-        <p className="text-slate-400">{brandTagline}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <h1 style={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-0.04em', margin: 0 }}>{brandName}</h1>
+        <p style={{ color: '#7A8B84', fontSize: '1.125rem' }}>{brandTagline}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Link
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <HomeCard
           href="/content"
-          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-cyan-500/50 rounded-lg p-6 transition-all hover:shadow-xl hover:shadow-cyan-500/20"
-        >
-          <div className="space-y-3">
-            <div className="text-3xl">📝</div>
-            <h2 className="text-xl font-bold text-white">Conteúdo</h2>
-            <p className="text-slate-400 text-sm">
-              Crie, aprove e agende posts. Mantenha seu calendário editorial organizado.
-            </p>
-            <div className="pt-2 text-cyan-400 text-sm font-medium group-hover:gap-2 flex items-center transition-all">
-              Gerenciar →
-            </div>
-          </div>
-        </Link>
+          icon="📝"
+          title="Conteúdo"
+          description="Crie, aprove e agende posts. Mantenha seu calendário editorial organizado."
+          cta="Gerenciar"
+        />
 
-        <Link
+        <HomeCard
           href="/inbox"
-          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-green-500/50 rounded-lg p-6 transition-all hover:shadow-xl hover:shadow-green-500/20"
-        >
-          <div className="space-y-3">
-            <div className="text-3xl">💬</div>
-            <h2 className="text-xl font-bold text-white">Atendimento</h2>
-            <p className="text-slate-400 text-sm">
-              Automatize respostas com IA ou encaminhe para humano. Nunca perda um lead.
-            </p>
-            <div className="pt-2 text-green-400 text-sm font-medium group-hover:gap-2 flex items-center transition-all">
-              Responder →
-            </div>
-          </div>
-        </Link>
+          icon="💬"
+          title="Atendimento"
+          description="Automatize respostas com IA ou encaminhe para humano. Nunca perca um lead."
+          cta="Responder"
+        />
 
-        <Link
+        <HomeCard
           href="/knowledge-base"
-          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-purple-500/50 rounded-lg p-6 transition-all hover:shadow-xl hover:shadow-purple-500/20"
-        >
-          <div className="space-y-3">
-            <div className="text-3xl">📚</div>
-            <h2 className="text-xl font-bold text-white">Base de Conhecimento</h2>
-            <p className="text-slate-400 text-sm">
-              Mantenha perguntas e respostas para treinar a IA de atendimento.
-            </p>
-            <div className="pt-2 text-purple-400 text-sm font-medium group-hover:gap-2 flex items-center transition-all">
-              Editar →
-            </div>
-          </div>
-        </Link>
+          icon="📚"
+          title="Base de Conhecimento"
+          description="Mantenha perguntas e respostas para treinar a IA de atendimento."
+          cta="Editar"
+        />
 
-        <Link
+        <HomeCard
           href="/settings"
-          className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-orange-500/50 rounded-lg p-6 transition-all hover:shadow-xl hover:shadow-orange-500/20"
-        >
-          <div className="space-y-3">
-            <div className="text-3xl">⚙️</div>
-            <h2 className="text-xl font-bold text-white">Configurações</h2>
-            <p className="text-slate-400 text-sm">
-              Conecte seus serviços de publicação, atendimento e CRM com segurança.
-            </p>
-            <div className="pt-2 text-orange-400 text-sm font-medium group-hover:gap-2 flex items-center transition-all">
-              Configurar →
-            </div>
-          </div>
-        </Link>
+          icon="⚙️"
+          title="Configurações"
+          description="Conecte seus serviços de publicação, atendimento e CRM com segurança."
+          cta="Configurar"
+        />
       </div>
 
-      <div className="bg-blue-950/30 border border-blue-800/50 rounded-lg p-6">
-        <h3 className="text-white font-bold mb-2">ℹ️ Configuração necessária</h3>
-        <p className="text-slate-300 text-sm">Antes de usar o sistema:</p>
-        <ul className="text-slate-400 text-sm mt-3 space-y-1 ml-4 list-disc">
+      <div style={{ backgroundColor: '#14383D', border: '1px solid #0E2A2E', color: '#FAFAF8', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <h3 style={{ fontWeight: 700, fontSize: '1rem', margin: 0 }}>Configuração necessária</h3>
+        <p style={{ fontSize: '0.875rem', opacity: 0.9, margin: 0 }}>Antes de usar o sistema:</p>
+        <ul style={{ fontSize: '0.875rem', marginTop: '0.75rem', marginLeft: '1rem', listStyleType: 'disc', opacity: 0.9, paddingLeft: '1rem' }}>
           <li>Configure API keys no .env (Publora, Zernio, Claude)</li>
           <li>Conecte sua conta do Instagram via Publora</li>
           <li>Configure webhook de Zernio para receber mensagens</li>
