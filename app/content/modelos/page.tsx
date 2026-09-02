@@ -84,7 +84,7 @@ export default function ModelosPage() {
         }
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', width: '100%' }}>
         {/* Filtros */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
