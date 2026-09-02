@@ -207,7 +207,7 @@ export default function DashboardPage() {
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>
-                💬 Conversas {(overview?.conversas_total || 0) > 0 && <span style={{ fontSize: '0.875rem', color: '#D6F24B', marginLeft: '0.5rem', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px' }}>({overview?.conversas_aguardando_humano})</span>}
+                💬 Conversas {(overview?.conversas_total || 0) > 0 && <span style={{ fontSize: '0.875rem', color: '#D6F24B', marginLeft: '0.5rem', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px' }}>({overview?.conversas_total})</span>}
               </h3>
               <Link href="/inbox" style={{ fontSize: '0.75rem', color: '#D6F24B', textDecoration: 'none', fontWeight: 600 }}>
                 Ver todas
