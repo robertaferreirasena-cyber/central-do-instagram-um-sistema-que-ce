@@ -22,20 +22,25 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get('X-Zernio-Signature') || '';
     const secret = process.env.ZERNIO_WEBHOOK_SECRET;
 
-    if (!secret || !signature) {
-      console.warn('⚠️ Webhook Zernio: secret ou signature ausentes');
-      return NextResponse.json(
-        { success: false, error: 'Autenticação falhou' } as ApiResponse<null>,
-        { status: 401 }
-      );
-    }
+    // Se secret configurado, DEVE validar assinatura. Se não, permitir em dev.
+    if (secret) {
+      if (!signature) {
+        console.warn('⚠️ Webhook Zernio: signature ausente (secret configurado)');
+        return NextResponse.json(
+          { success: false, error: 'Autenticação falhou' } as ApiResponse<null>,
+          { status: 401 }
+        );
+      }
 
-    if (!ZernioClient.verifySignature(secret, rawBody, signature)) {
-      console.warn('❌ Webhook Zernio: assinatura HMAC inválida');
-      return NextResponse.json(
-        { success: false, error: 'Assinatura inválida' } as ApiResponse<null>,
-        { status: 401 }
-      );
+      if (!ZernioClient.verifySignature(secret, rawBody, signature)) {
+        console.warn('❌ Webhook Zernio: assinatura HMAC inválida');
+        return NextResponse.json(
+          { success: false, error: 'Assinatura inválida' } as ApiResponse<null>,
+          { status: 401 }
+        );
+      }
+    } else {
+      console.warn('⚠️ Webhook Zernio: ZERNIO_WEBHOOK_SECRET não configurado (dev mode)');
     }
 
     const payload = JSON.parse(rawBody);
