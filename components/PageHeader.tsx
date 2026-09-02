@@ -12,8 +12,15 @@ interface PageHeaderProps {
 
 export function PageHeader({ tag, title, subtitle, actions }: PageHeaderProps) {
   return (
-    <div style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: '#FAFAF8', paddingBottom: '2rem' }}>
-      <div style={{ paddingLeft: '280px', padding: '2rem 2rem 0 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '2rem' }}>
+    <div style={{ borderBottom: '1px solid #E2E2DE', backgroundColor: '#FAFAF8', paddingBottom: '2rem', marginLeft: '280px' }}>
+      <style>{`
+        @media (max-width: 899px) {
+          .page-header {
+            margin-left: 0;
+          }
+        }
+      `}</style>
+      <div style={{ padding: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '2rem' }}>
         <div style={{ flex: 1 }}>
           {tag && (
             <div style={{ fontFamily: jetBrainsMono.style.fontFamily, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#7A8B84', marginBottom: '0.5rem' }}>
