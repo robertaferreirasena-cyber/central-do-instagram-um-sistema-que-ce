@@ -13,6 +13,8 @@ export default function InboxPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const focusRef = useRef(false);
 
   // Auto-scroll para o fim quando novas mensagens chegam
   const scrollToBottom = () => {
@@ -81,18 +83,21 @@ export default function InboxPage() {
     }
   }, [selectedId]);
 
-  // Auto-refresh a cada 15s (pausa se campo em foco)
+  // Mantém refs atualizadas pro interval ler sem recriar o timer
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { focusRef.current = isMessageInputFocused; }, [isMessageInputFocused]);
+
+  // Auto-refresh a cada 15s (pausa se campo em foco) — criado UMA vez
   useEffect(() => {
     loadConversations(); // Carrega uma vez ao montar
 
     autoRefreshIntervalRef.current = setInterval(async () => {
-      // Recarregar lista de conversas
+      if (focusRef.current) return; // pausa enquanto está digitando
       await loadConversations();
-
-      // Se há conversa aberta, sincronizar e recarregar mensagens
-      if (selectedId && !isMessageInputFocused) {
-        await syncConversation(selectedId);
-        await loadMessages(selectedId);
+      const sid = selectedIdRef.current;
+      if (sid) {
+        await syncConversation(sid);
+        await loadMessages(sid);
       }
     }, 15000); // 15 segundos
 
@@ -101,7 +106,8 @@ export default function InboxPage() {
         clearInterval(autoRefreshIntervalRef.current);
       }
     };
-  }, [selectedId, isMessageInputFocused]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredConversations = conversations.filter((conv) => {
     const matchesFilter =
