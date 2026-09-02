@@ -48,9 +48,10 @@ export default function InboxPage() {
   const filteredConversations = conversations.filter((conv) => {
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'mine' && conv.is_assigned) ||
-      (filter === 'needs_human' && conv.needs_human);
-    const matchesSearch = conv.lead_name?.toLowerCase().includes(search.toLowerCase());
+      (filter === 'mine' && (conv.is_assigned || conv.agente_id)) ||
+      (filter === 'needs_human' && conv.estado === 'aguardando_humano');
+    const nome = (conv.participant_name || conv.participant_username || '').toLowerCase();
+    const matchesSearch = !search || nome.includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -185,17 +186,17 @@ export default function InboxPage() {
                     <div style={{ width: '36px', height: '36px', borderRadius: '9999px', backgroundColor: '#D6F24B', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {conv.lead_name || 'Contato'}
+                        {conv.participant_name || conv.participant_username || 'Contato'}
                       </p>
                       <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#7A8B84', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', height: '1.2em' }}>
                         {conv.last_message || 'Sem mensagens'}
                       </p>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.65rem' }}>
                         <span style={{ backgroundColor: '#D6F24B', color: '#0E2A2E', padding: '0.125rem 0.375rem', fontWeight: 600 }}>
-                          {conv.source === 'direct' ? 'Direct' : 'Comentário'}
+                          {conv.origem === 'comment' ? 'Comentário' : 'Direct'}
                         </span>
                         <span style={{ color: '#7A8B84' }}>
-                          {new Date(conv.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {conv.updated_time ? new Date(conv.updated_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
                     </div>
@@ -220,10 +221,10 @@ export default function InboxPage() {
                 <div style={{ width: '36px', height: '36px', borderRadius: '9999px', backgroundColor: '#D6F24B' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E' }}>
-                    {selectedConversation.lead_name}
+                    {selectedConversation.participant_name || selectedConversation.participant_username || 'Contato'}
                   </p>
                   <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#7A8B84' }}>
-                    {selectedConversation.source === 'direct' ? 'Direct' : 'Comentário'} • {new Date(selectedConversation.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    {selectedConversation.origem === 'comment' ? 'Comentário' : 'Direct'}{selectedConversation.updated_time ? ' • ' + new Date(selectedConversation.updated_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>
                 </div>
               </div>
