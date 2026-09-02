@@ -4,6 +4,7 @@ import { zernio, ZernioClient, type ZernioConversation, type ZernioMessage } fro
 import { downloadMediaToStorage } from '@/lib/storage';
 import { ApiResponse } from '@/types';
 import { processarComentario, processarStoryReply, type CommentPayload, type StoryReplyPayload } from '@/lib/instagram';
+import { autoResponder } from '@/lib/agente';
 
 // POST - Webhook de Zernio (message.received, conversation.started, comment.received)
 export async function POST(req: NextRequest) {
@@ -290,6 +291,26 @@ async function ingerirMensagem(parsed: ParsedEvent) {
     }
 
     console.log('✅ Mensagem ingerida:', parsed.msg_id);
+
+    // 6. Se é story reply, processar via automação (não chama agente por cima)
+    if (parsed.is_story_reply) {
+      console.log('📖 Story reply detectado, processando via automação');
+      const storyPayload: StoryReplyPayload = {
+        conversation_id: conversation.id,
+        lead_id: undefined,
+        texto: parsed.texto,
+        story_id: parsed.story_id || '',
+        account_id: account_id,
+      };
+      await processarStoryReply(storyPayload);
+      return;
+    }
+
+    // 7. Senão (DM direto), chamar autoResponder se conversa em modo='agente'
+    // (assíncrono, não bloqueia a resposta do webhook)
+    autoResponder(conversation.id).catch(err => {
+      console.error('❌ Erro em autoResponder:', err);
+    });
   } catch (err) {
     console.error('❌ Erro ao ingerir mensagem:', err);
   }
