@@ -262,10 +262,10 @@ export async function autoResponder(conversationId: string): Promise<void> {
   if (!supabase) return;
 
   try {
-    // 1. Verificar se a conversa está em modo='agente' e não resolvida
+    // 1. Verificar se a conversa está em modo='agente'
     const { data: conversation } = await supabase
       .from('zernio_conversations')
-      .select('id, agente_id, modo')
+      .select('id, agente_id, modo, lead_id')
       .eq('id', conversationId)
       .single();
 
@@ -282,7 +282,7 @@ export async function autoResponder(conversationId: string): Promise<void> {
     // 2. Buscar agente
     const { data: agente } = await supabase
       .from('agents')
-      .select('nome, persona, funcao, instrucoes')
+      .select('id, nome, persona, funcao, instrucoes')
       .eq('id', conversation.agente_id)
       .single();
 
@@ -291,7 +291,22 @@ export async function autoResponder(conversationId: string): Promise<void> {
       return;
     }
 
-    // 3. Buscar últimas 8 mensagens
+    // 3. Anti-duplicação: verificar se já há sugestão pendente (<24h)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: pendingExisting } = await supabase
+      .from('agente_sugestoes')
+      .select('id')
+      .eq('conversa_id', conversationId)
+      .eq('status', 'pendente')
+      .gt('created_at', oneDayAgo)
+      .single();
+
+    if (pendingExisting) {
+      console.log(`✋ Sugestão pendente já existe para ${conversationId} (409)`);
+      return;
+    }
+
+    // 4. Buscar últimas 8 mensagens
     const { data: messages } = await supabase
       .from('zernio_messages')
       .select('autor, content, direcao, created_at')
@@ -303,7 +318,7 @@ export async function autoResponder(conversationId: string): Promise<void> {
       return;
     }
 
-    // 4. Montar histórico para LLM
+    // 5. Montar histórico para LLM
     const systemPrompt = await agenteSysPrompt(agente.funcao, agente.persona, agente.instrucoes);
     const llmMessages: LLMMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -313,40 +328,49 @@ export async function autoResponder(conversationId: string): Promise<void> {
       })),
     ];
 
-    // 5. Chamar LLM
+    // 6. Chamar LLM
     let response = await cerebro(llmMessages, 420, 0.6);
 
     if (!response.success || !response.content) {
-      // Retry com temp menor
       response = await cerebro(llmMessages, 420, 0.4);
     }
 
     if (!response.success || !response.content) {
-      // Redirect padrão
-      const redirect = redirecionamentoPadrao(conversationId);
-      console.log(`Agente falhou, usando redirect: ${redirect}`);
-      // TODO: Enviar redirect via Zernio
+      console.log(`⚠️ Agente falhou ao gerar sugestão`);
       return;
     }
 
-    // 6. Validar e limpar resposta
+    // 7. Validar e limpar resposta
     let resposta = response.content;
     if (!respostaValida(resposta)) {
-      // Retry
       const retryResponse = await cerebro(llmMessages, 420, 0.4);
       if (!retryResponse.success || !retryResponse.content) {
-        const redirect = redirecionamentoPadrao(conversationId);
-        console.log(`Retry falhou, usando redirect: ${redirect}`);
+        console.log(`⚠️ Retry falhou ao gerar sugestão`);
         return;
       }
       resposta = retryResponse.content;
     }
 
     resposta = limparResposta(resposta);
-    resposta = resposta.substring(0, 950); // Truncar para limite do DM
+    resposta = resposta.substring(0, 950);
 
-    console.log(`✅ Resposta agente (${agente.nome}): ${resposta.substring(0, 100)}`);
-    // TODO: Enviar resposta via Zernio (zernio.sendMessage)
+    // 8. Salvar na fila como PENDENTE (não enviar direto)
+    const { error: insertError } = await supabase
+      .from('agente_sugestoes')
+      .insert({
+        conversa_id: conversationId,
+        agente_id: agente.id,
+        sugestao: resposta,
+        status: 'pendente',
+        lead_ref: conversation.lead_id,
+      });
+
+    if (insertError) {
+      console.error('Erro ao salvar sugestão:', insertError);
+      return;
+    }
+
+    console.log(`📋 Sugestão criada (pendente) para ${conversationId}`);
   } catch (err) {
     console.error('❌ Erro em autoResponder:', err);
   }
