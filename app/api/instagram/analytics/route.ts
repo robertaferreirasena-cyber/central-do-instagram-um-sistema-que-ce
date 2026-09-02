@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { zernio } from '@/lib/zernio';
 
 const getSupabase = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -34,11 +33,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Buscar config do Zernio (último cache)
+    // 1. Buscar cache do Zernio analytics (crm_config.zernio_analytics)
     const { data: configData } = await supabase
       .from('crm_config')
-      .select('zernio_analytics')
-      .eq('account_id', accountId)
+      .select('valor')
+      .eq('chave', 'zernio_analytics')
       .single();
 
     let analyticsData = {
@@ -51,11 +50,34 @@ export async function GET(req: NextRequest) {
       posts: [] as any[],
     };
 
-    if (configData?.zernio_analytics) {
-      analyticsData = configData.zernio_analytics;
+    // Parsing do cache (stored as JSON string)
+    if (configData?.valor) {
+      try {
+        const parsed = JSON.parse(configData.valor);
+        analyticsData = {
+          followers: parsed.followers || 0,
+          reach: parsed.totalReach || 0,
+          likes: parsed.totalLikes || 0,
+          comments: parsed.totalComments || 0,
+          saves: parsed.totalSaves || 0,
+          engagement: parsed.engagement || 0,
+          posts: parsed.posts || [],
+        };
+      } catch (e) {
+        console.warn('Erro ao parsear zernio_analytics:', e);
+      }
     }
 
-    // Buscar KPIs de leads
+    // 2. Se cache vazio, dispara sync UMA VEZ (via fetch sem await)
+    if (!analyticsData.posts || analyticsData.posts.length === 0) {
+      // Fire-and-forget: inicialar sync sem bloquear a response
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/zernio/sync-content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch((err) => console.error('Erro ao disparar sync:', err));
+    }
+
+    // 3. Buscar KPIs de leads
     const { data: leadsData } = await supabase
       .from('leads')
       .select('status')
