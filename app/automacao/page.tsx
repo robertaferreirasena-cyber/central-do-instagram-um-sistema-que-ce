@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { PageHeader } from '@/components/PageHeader';
+import { avisosDoGrafo, contarPendencias, type ValidacaoGrafo } from '@/lib/flowValidation';
 import FlowTriggerNode from '@/components/flow/FlowTriggerNode';
 import FlowTextNode from '@/components/flow/FlowTextNode';
 import FlowConditionNode from '@/components/flow/FlowConditionNode';
@@ -40,6 +41,7 @@ export default function AutomacaoPage() {
     respondAll: false,
     humanHandoff: false,
   });
+  const [validacao, setValidacao] = useState<ValidacaoGrafo>({ avisos: [], pendencias: 0, temErros: false });
 
   useEffect(() => {
     loadFlows();
@@ -82,6 +84,12 @@ export default function AutomacaoPage() {
       respondAll: false,
       humanHandoff: false,
     });
+    // Calcula avisos do fluxo
+    const triggerData = {
+      trigger_type: flow.trigger_type,
+      trigger_value: flow.trigger_value,
+    };
+    setValidacao(avisosDoGrafo(flow, triggerData));
   };
 
   const saveFlow = async () => {
@@ -168,6 +176,26 @@ export default function AutomacaoPage() {
     }
   };
 
+  const importDirectProFlows = async () => {
+    try {
+      const res = await fetch('/api/flows/import-directpro', {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Importados ${data.flows?.length || 0} fluxos prontos! Todos em rascunho.`);
+        loadFlows();
+      } else {
+        const error = await res.json();
+        alert('Erro ao importar: ' + error.error);
+      }
+    } catch (error) {
+      console.error('Erro ao importar fluxos:', error);
+      alert('Erro ao importar fluxos');
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -222,22 +250,38 @@ export default function AutomacaoPage() {
           <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E', textTransform: 'uppercase' }}>
             Meus funis
           </h3>
-          <button
-            onClick={createNewFlow}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: '#D6F24B',
-              color: '#0E2A2E',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              marginBottom: '1rem',
-            }}
-          >
-            + Novo funil
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+            <button
+              onClick={createNewFlow}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: '#D6F24B',
+                color: '#0E2A2E',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+              }}
+            >
+              + Novo funil
+            </button>
+            <button
+              onClick={importDirectProFlows}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: 'transparent',
+                color: '#0E2A2E',
+                border: '1px solid #0E2A2E',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+              }}
+            >
+              Importar modelos prontos
+            </button>
+          </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {flows.map((flow) => (
@@ -310,6 +354,36 @@ export default function AutomacaoPage() {
               padding: '1.5rem',
             }}
           >
+            {/* Avisos */}
+            {validacao.avisos.length > 0 && (
+              <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #E2E2DE' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', fontWeight: 600, color: '#0E2A2E', textTransform: 'uppercase' }}>
+                  Pendências [{validacao.pendencias}]
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {validacao.avisos.map((aviso, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor:
+                          aviso.tipo === 'erro' ? '#FFE5E5' : aviso.tipo === 'aviso' ? '#FFF4E5' : '#E5F4FF',
+                        border:
+                          aviso.tipo === 'erro' ? '1px solid #FFB3B3' : aviso.tipo === 'aviso' ? '1px solid #FFCE99' : '1px solid #99D6FF',
+                        padding: '0.5rem',
+                        borderRadius: 0,
+                        fontSize: '0.7rem',
+                        color:
+                          aviso.tipo === 'erro' ? '#8B0000' : aviso.tipo === 'aviso' ? '#664400' : '#004488',
+                        lineHeight: '1.3',
+                      }}
+                    >
+                      {aviso.mensagem}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E', textTransform: 'uppercase' }}>
               Configuração do gatilho
             </h3>
