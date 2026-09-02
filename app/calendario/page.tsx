@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { TENANT_TEXT } from '@/lib/tenant';
 
 type ViewMode = 'mes' | 'semana';
 
@@ -16,7 +17,7 @@ export default function CalendarioPage() {
 
   const loadBriefs = async () => {
     try {
-      const res = await fetch('/api/content/briefs?account_id=default-account');
+      const res = await fetch(`/api/content/briefs?account_id=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         setBriefs(Array.isArray(data.data) ? data.data : []);
@@ -262,7 +263,7 @@ export default function CalendarioPage() {
         }
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem', width: '100%' }}>
         {/* ÁREA PRINCIPAL: Calendário */}
         <div>
           {/* Toggle Mês/Semana */}
