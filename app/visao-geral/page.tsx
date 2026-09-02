@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPost[]>([]);
   const [pendingReview, setPendingReview] = useState<any[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationCount, setConversationCount] = useState<number>(0);
   const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,6 +62,7 @@ export default function DashboardPage() {
       if (convRes.ok) {
         const data = await convRes.json();
         const convs = Array.isArray(data.data) ? data.data : [];
+        setConversationCount(convs.length);
         setConversations(convs.slice(0, 3));
       }
 
@@ -175,14 +177,16 @@ export default function DashboardPage() {
           {/* Conversas aguardando resposta */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>💬 Conversas</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>
+                💬 Conversas {conversationCount > 0 && <span style={{ fontSize: '0.875rem', color: '#D6F24B', marginLeft: '0.5rem', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px' }}>({conversationCount})</span>}
+              </h3>
               <Link href="/inbox" style={{ fontSize: '0.75rem', color: '#D6F24B', textDecoration: 'none', fontWeight: 600 }}>
                 Ver todas
               </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {conversations.length === 0 ? (
-                <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhuma conversa pendente</p>
+              {conversationCount === 0 ? (
+                <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhuma conversa</p>
               ) : (
                 conversations.map((conv) => (
                   <div key={conv.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
