@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { getContentAccountId } from '@/lib/tenant';
 import { ContentBrief, ContentStatus, ApiResponse } from '@/types';
 
 // GET - Listar briefs
@@ -7,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') as ContentStatus | null;
-    const accountId = searchParams.get('account_id');
+    const accountId = await getContentAccountId();
 
     let query = supabase.from('content_briefs').select('*');
 
@@ -39,16 +40,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<ContentBrief>;
 
-    // Validar campos obrigatórios
-    if (!body.account_id || !body.type || !body.caption || !body.scheduled_at) {
+    // Validar campos obrigatórios (account_id é resolvido no servidor)
+    if (!body.type || !body.caption || !body.scheduled_at) {
       return NextResponse.json(
-        { success: false, error: 'Campos obrigatórios faltando: account_id, type, caption, scheduled_at' } as ApiResponse<null>,
+        { success: false, error: 'Campos obrigatórios faltando: type, caption, scheduled_at' } as ApiResponse<null>,
         { status: 400 }
       );
     }
 
     const brief = {
-      account_id: body.account_id,
+      account_id: await getContentAccountId(),
       type: body.type,
       theme: body.theme || '',
       caption: body.caption,
