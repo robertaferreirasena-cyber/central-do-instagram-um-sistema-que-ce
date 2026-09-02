@@ -11,42 +11,40 @@ export async function POST(req: NextRequest) {
   try {
     const event = await req.json();
 
-    // Validar webhook (implementar assinatura HMAC se Zernio exigir)
-    // Por enquanto, apenas logar e processar
+    // Payload Zernio real:
+    // { conversation_id, message_id, sender_username, content, platform, profile_id, created_at }
+    const { conversation_id, message_id, sender_username, content, platform, profile_id, created_at } = event;
 
-    const { interaction_type, sender_username, content, platform, conversation_id, message_id } = event;
-
-    if (!sender_username || !content) {
+    if (!sender_username || !content || !message_id) {
       return NextResponse.json(
         { success: false, error: 'Campos obrigatórios faltando' } as ApiResponse<null>,
         { status: 400 }
       );
     }
 
-    // 1. Buscar account
+    // 1. Buscar account pela profile_id do Zernio
     const { data: account } = await supabase
       .from('instagram_accounts')
       .select('id, zernio_profile_id')
-      .eq('zernio_profile_id', event.profile_id)
+      .eq('zernio_profile_id', profile_id)
       .single();
 
     if (!account) {
+      console.warn(`Account não encontrada para profile_id: ${profile_id}`);
       return NextResponse.json(
-        { success: false, error: 'Conta não encontrada' } as ApiResponse<null>,
-        { status: 404 }
+        { success: true, data: { skipped: true, reason: 'account_not_found' } } as ApiResponse<any>
       );
     }
 
-    // 2. Verificar se evento já foi processado (external_event_id único)
+    // 2. Dedupe por external_event_id (message_id único do Zernio)
     const { data: existing } = await supabase
       .from('instagram_interactions')
       .select('id')
       .eq('external_event_id', message_id)
       .eq('account_id', account.id)
-      .single();
+      .maybeSingle();
 
     if (existing) {
-      // Evento já processado, retornar ok
       return NextResponse.json({ success: true, data: { duplicate: true } } as ApiResponse<any>);
     }
 
@@ -75,7 +73,6 @@ export async function POST(req: NextRequest) {
       shouldForward = genResult.data.should_forward_to_human;
       confidence = genResult.data.confidence;
 
-      // Encontrar qual item da base foi usado (simplificado)
       if (!shouldForward && knowledgeBase) {
         const matchedKb = knowledgeBase.find((k: any) => k.answer.toLowerCase().includes(autoResponse.toLowerCase().substring(0, 20)));
         if (matchedKb) {
@@ -84,7 +81,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. Criar interação
+    // 5. Criar interação com dedupe
     const interactionStatus = shouldForward ? InteractionStatus.PENDING_HUMAN : InteractionStatus.AUTO_RESPONDED;
 
     const { data: interaction, error: interactionError } = await supabase
@@ -94,14 +91,15 @@ export async function POST(req: NextRequest) {
           account_id: account.id,
           external_event_id: message_id,
           sender_username,
-          interaction_type: interaction_type || 'dm',
+          interaction_type: 'dm',
           content,
           status: interactionStatus,
           auto_response: autoResponse || null,
           base_conhecimento_id: baseKbId,
           confidence_score: confidence,
           zernio_message_id: message_id,
-          created_at: new Date(),
+          platform: platform || 'instagram',
+          created_at: created_at ? new Date(created_at) : new Date(),
           updated_at: new Date(),
         },
       ])
@@ -118,18 +116,14 @@ export async function POST(req: NextRequest) {
 
     // 6. Se confiança alta, responder automaticamente via Zernio
     if (!shouldForward && autoResponse) {
-      const sendResult = await zernio.sendMessage({
-        conversation_id: conversation_id || '',
-        content: autoResponse,
-        platform: platform || 'instagram',
-      });
+      const sendResult = await zernio.sendMessage(conversation_id, autoResponse);
 
       if (sendResult.error) {
         console.error('Erro ao enviar resposta:', sendResult.error);
       }
     }
 
-    // 7. Se precisa de humano, notificar atendente e marcar para handoff
+    // 7. Se precisa de humano, notificar atendente
     if (shouldForward) {
       await supabase
         .from('instagram_interactions')
@@ -163,7 +157,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, data: { created: true } } as ApiResponse<any>);
+    return NextResponse.json({ success: true, data: { created: true, interaction_id: interaction.id } } as ApiResponse<any>);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('Webhook error:', message);
