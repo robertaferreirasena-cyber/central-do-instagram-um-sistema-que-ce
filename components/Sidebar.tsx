@@ -18,12 +18,14 @@ export function Sidebar({ brandName }: SidebarProps) {
 
   const navItems = [
     { href: '/visao-geral', label: 'Visão geral', icon: '📊' },
-    { href: '/conteudo', label: 'Conteúdo', icon: '✍️' },
+    { href: '/content', label: 'Conteúdo', icon: '✍️' },
+    { href: '/content/modelos', label: 'Biblioteca de modelos', icon: '🎨' },
     { href: '/calendario', label: 'Calendário', icon: '📅' },
     { href: '/publicacoes', label: 'Publicações', icon: '📱' },
     { href: '/automacao', label: 'Automação', icon: '⚙️' },
     { href: '/inbox', label: 'Inbox', icon: '💬' },
     { href: '/analise', label: 'Análise', icon: '📈' },
+    { href: '/brain', label: 'Brain System', icon: '🧠' },
   ];
 
   const isActive = (href: string) => {
