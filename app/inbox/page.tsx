@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 
 export default function InboxPage() {
@@ -9,17 +9,21 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<'all' | 'mine' | 'needs_human'>('all');
   const [search, setSearch] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
+  const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll para o fim quando novas mensagens chegam
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    scrollToBottom();
+  }, [messages]);
 
-  useEffect(() => {
-    if (selectedId) {
-      loadMessages(selectedId);
-    }
-  }, [selectedId]);
-
+  // Carregar conversas
   const loadConversations = async () => {
     try {
       const res = await fetch('/api/instagram/conversa-atendimento?account_id=default-account');
@@ -28,10 +32,32 @@ export default function InboxPage() {
         setConversations(Array.isArray(data.data) ? data.data : []);
       }
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('Erro ao carregar conversas:', error);
     }
   };
 
+  // Sincronizar conversa com Zernio (throttle no servidor)
+  const syncConversation = async (conversationId: string, force = false) => {
+    if (!conversationId || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/zernio/sync-conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conversationId, force }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Sync result:', data.data);
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar conversa:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Carregar mensagens de uma conversa
   const loadMessages = async (conversationId: string) => {
     try {
       const res = await fetch(`/api/instagram/messages?conversation_id=${conversationId}`);
@@ -40,10 +66,42 @@ export default function InboxPage() {
         setMessages(Array.isArray(data.data) ? data.data : []);
       }
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('Erro ao carregar mensagens:', error);
       setMessages([]);
     }
   };
+
+  // Sincronizar ao selecionar conversa (não bloqueia a UI)
+  useEffect(() => {
+    if (selectedId) {
+      // Carrega mensagens locais imediatamente
+      loadMessages(selectedId);
+      // Sincroniza com Zernio em background
+      syncConversation(selectedId);
+    }
+  }, [selectedId]);
+
+  // Auto-refresh a cada 15s (pausa se campo em foco)
+  useEffect(() => {
+    loadConversations(); // Carrega uma vez ao montar
+
+    autoRefreshIntervalRef.current = setInterval(async () => {
+      // Recarregar lista de conversas
+      await loadConversations();
+
+      // Se há conversa aberta, sincronizar e recarregar mensagens
+      if (selectedId && !isMessageInputFocused) {
+        await syncConversation(selectedId);
+        await loadMessages(selectedId);
+      }
+    }, 15000); // 15 segundos
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [selectedId, isMessageInputFocused]);
 
   const filteredConversations = conversations.filter((conv) => {
     const matchesFilter =
@@ -228,7 +286,24 @@ export default function InboxPage() {
                   </p>
                 </div>
               </div>
-              <button style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>⋮</button>
+              <button
+                onClick={() => selectedId && syncConversation(selectedId, true)}
+                disabled={isSyncing}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '0.75rem',
+                  cursor: isSyncing ? 'not-allowed' : 'pointer',
+                  color: isSyncing ? '#A8BDB5' : '#7A8B84',
+                  fontWeight: 600,
+                  padding: '0.25rem 0.5rem',
+                  opacity: isSyncing ? 0.6 : 1,
+                  transition: 'all 200ms ease',
+                }}
+                title={isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
+              >
+                {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+              </button>
             </div>
 
             {/* Messages */}
@@ -238,30 +313,79 @@ export default function InboxPage() {
                   <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhuma mensagem ainda</p>
                 </div>
               ) : (
-                messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      justifyContent: msg.is_outgoing ? 'flex-end' : 'flex-start',
-                    }}
-                  >
+                <>
+                  {messages.map((msg, idx) => (
                     <div
+                      key={idx}
                       style={{
-                        maxWidth: '70%',
-                        backgroundColor: msg.is_outgoing ? '#D6F24B' : '#E8E8E4',
-                        color: msg.is_outgoing ? '#0E2A2E' : '#0E2A2E',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '0',
-                        fontSize: '0.875rem',
-                        lineHeight: 1.5,
+                        display: 'flex',
+                        justifyContent: msg.is_outgoing ? 'flex-end' : 'flex-start',
                       }}
                     >
-                      {msg.text}
-                      {msg.is_outgoing && <span style={{ marginLeft: '0.5rem' }}>✓✓</span>}
+                      <div
+                        style={{
+                          maxWidth: '70%',
+                          backgroundColor: msg.is_outgoing ? '#D6F24B' : '#E8E8E4',
+                          color: msg.is_outgoing ? '#0E2A2E' : '#0E2A2E',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '0',
+                          fontSize: '0.875rem',
+                          lineHeight: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        {/* Mídia inline */}
+                        {msg.media_url && msg.media_tipo === 'image' && (
+                          <a
+                            href={msg.media_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'block',
+                              cursor: 'pointer',
+                              marginBottom: '0.25rem',
+                            }}
+                          >
+                            <img
+                              src={msg.media_url}
+                              alt="Mensagem com imagem"
+                              loading="lazy"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '0',
+                                display: 'block',
+                              }}
+                            />
+                          </a>
+                        )}
+                        {msg.media_url && msg.media_tipo === 'video' && (
+                          <video
+                            src={msg.media_url}
+                            controls
+                            preload="metadata"
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '300px',
+                              borderRadius: '0',
+                              display: 'block',
+                            }}
+                          />
+                        )}
+                        {/* Texto da mensagem */}
+                        {msg.text && (
+                          <>
+                            {msg.text}
+                            {msg.is_outgoing && <span style={{ marginLeft: '0.5rem' }}>✓✓</span>}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
               )}
             </div>
 
@@ -307,6 +431,8 @@ export default function InboxPage() {
                   name="message"
                   type="text"
                   placeholder="Digite uma mensagem…"
+                  onFocus={() => setIsMessageInputFocused(true)}
+                  onBlur={() => setIsMessageInputFocused(false)}
                   style={{
                     flex: 1,
                     padding: '0.75rem',
