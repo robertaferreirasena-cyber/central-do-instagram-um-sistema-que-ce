@@ -47,6 +47,47 @@ export interface ZernioMessage {
   attachments?: ZernioAttachment[];
 }
 
+export interface ZernioPost {
+  _id: string;
+  content: string;
+  mediaType: 'video' | 'image' | 'carousel';
+  mediaProductType?: string; // FEED | REELS
+  thumbnailUrl: string;
+  platformPostUrl: string;
+  platform: string;
+  publishedAt: string;
+  status?: string;
+  analytics?: {
+    impressions?: number;
+    reach?: number;
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    saves?: number;
+  };
+}
+
+export interface ZernioAnalyticsResponse {
+  overview?: {
+    totalPosts?: number;
+    totalReach?: number;
+    totalLikes?: number;
+    totalComments?: number;
+    totalSaves?: number;
+  };
+  posts?: ZernioPost[];
+  accounts?: any[];
+}
+
+export interface ZernioStory {
+  id: string;
+  mediaType: 'video' | 'image';
+  mediaUrl: string;
+  permalink: string;
+  thumbnailUrl: string;
+  timestamp: string;
+}
+
 const ZERNIO_BASE_URL = process.env.ZERNIO_BASE_URL || 'https://zernio.com/api/v1';
 const ZERNIO_API_KEY = process.env.ZERNIO_API_KEY;
 const ZERNIO_WEBHOOK_SECRET = process.env.ZERNIO_WEBHOOK_SECRET;
@@ -267,6 +308,58 @@ export class ZernioClient {
 
       const data = await response.json();
       return { data, error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
+    }
+  }
+
+  // GET /analytics - analytics de posts e reels (seção 3.1)
+  async getAnalytics(platform: string = 'instagram', limit: number = 30): Promise<{ data: ZernioAnalyticsResponse | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      let url = `${this.baseUrl}/analytics?limit=${limit}`;
+      if (platform) url += `&platform=${platform}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      return { data: result, error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
+    }
+  }
+
+  // GET /accounts/{id}/instagram/stories - stories ativos (seção 3.2)
+  async listStories(accountId: string): Promise<{ data: ZernioStory[] | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      const url = `${this.baseUrl}/accounts/${accountId}/instagram/stories`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      return { data: result.data || [], error: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return { data: null, error: message };
