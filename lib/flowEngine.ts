@@ -1,5 +1,6 @@
 import { supabase, dbQuery } from './db';
 import { canSendFollowReminder } from './variables';
+import { isValidEmail, extractEmail } from './utils';
 
 export interface FlowStep {
   id: string;
@@ -326,8 +327,51 @@ export async function resumeFlowFromButton(
   const currentStep = flow.steps[run.current_step];
   if (!currentStep) return null;
 
-  // Registra o botão clicado no context
   if (!run.context) run.context = { _journey: [] };
+
+  // C2: Validação de e-mail se step anterior é collect_data com field_name='email'
+  if (currentStep.type === 'collect_data' && currentStep.field_name === 'email') {
+    const email = extractEmail(buttonValue);
+    if (!email || !isValidEmail(email)) {
+      // E-mail inválido: reenvia UMA vez o pedido
+      const retryCount = (run.context._email_retry_count || 0);
+      if (retryCount < 1) {
+        // Primeira tentativa falhou: reenvia pedido
+        run.context._email_retry_count = retryCount + 1;
+        run.status = 'waiting';
+        // Salva contexto
+        await dbQuery(() =>
+          supabase
+            .from('flow_runs')
+            .update({ context: run.context, atualizado_em: new Date().toISOString() })
+            .eq('id', run.id)
+        );
+        // Retorna ação de reenvio
+        return {
+          run,
+          actions: [
+            {
+              type: 'send_message',
+              text: 'Acho que esse e-mail saiu errado, me manda só o e-mail',
+              is_private: true,
+            },
+          ],
+        };
+      }
+      // Se já tentou uma vez, ignora e avança mesmo assim
+    }
+    // E-mail válido: salva no context e avança
+    if (email) {
+      run.context[currentStep.field_name] = email;
+    }
+  } else {
+    // Para outros tipos de collect_data ou steps, salva normalmente
+    if (currentStep.type === 'collect_data' && currentStep.field_name) {
+      run.context[currentStep.field_name] = buttonValue;
+    }
+  }
+
+  // Registra o botão clicado no context
   run.context.last_button_clicked = buttonValue;
   run.context.button_step = run.current_step;
 
@@ -362,6 +406,72 @@ export async function listFlows(enabled?: boolean): Promise<Flow[]> {
 
   const { data } = await dbQuery(() => query);
   return (data as Flow[]) || [];
+}
+
+// C4: Buscar fluxos que casam com trigger, keyword e opcionalmente media_id
+export async function matchFlows(
+  triggerType: string,
+  keyword: string,
+  mediaId?: string
+): Promise<Flow[]> {
+  if (!supabase) return [];
+
+  try {
+    // Buscar fluxos ativos
+    const { data: flows, error } = await dbQuery(() =>
+      supabase
+        .from('flows')
+        .select('*')
+        .eq('enabled', true)
+        .eq('trigger_type', triggerType)
+        .order('priority', { ascending: false })
+    );
+
+    if (error || !flows) return [];
+
+    // Importar normalizeText aqui (para evitar circular imports)
+    const { normalizeText } = await import('./utils');
+    const normalizedKeyword = normalizeText(keyword);
+
+    // Filtrar por palavra-chave e media_id
+    const matched = (flows as Flow[]).filter((flow) => {
+      // Se fluxo está amarrado a um post específico, comparar media_id
+      if (flow.post_ig_id && flow.post_ig_id !== mediaId) {
+        return false;
+      }
+
+      // Se não tem keyword, casou (qualquer acionamento vale)
+      if (!flow.trigger_value || flow.trigger_value.trim() === '') {
+        return true;
+      }
+
+      // Comparar keyword(s) usando normalizeText e match_mode
+      const keywords = flow.trigger_value
+        .split(',')
+        .map((k) => normalizeText(k))
+        .filter((k) => k);
+
+      for (const kw of keywords) {
+        const matchMode = flow.match_mode || 'contem';
+        if (matchMode === 'exata' && normalizedKeyword === kw) {
+          return true;
+        }
+        if (matchMode === 'comeca' && normalizedKeyword.startsWith(kw)) {
+          return true;
+        }
+        if (matchMode === 'contem' && normalizedKeyword.includes(kw)) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    return matched;
+  } catch (err) {
+    console.error('Erro em matchFlows:', err);
+    return [];
+  }
 }
 
 export async function createFlow(flowData: Partial<Flow>): Promise<Flow | null> {
