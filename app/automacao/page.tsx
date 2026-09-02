@@ -68,15 +68,27 @@ export default function AutomacaoPage() {
 
   const selectFlow = (flow: any) => {
     setSelectedFlow(flow);
-    // Carrega os nós e arestas do fluxo salvo
+    // Carrega os nós do fluxo salvo
     if (flow.steps && Array.isArray(flow.steps)) {
       const newNodes = flow.steps.map((step: any, idx: number) => ({
         id: step.id || `step-${idx}`,
         data: { label: step.type },
-        position: { x: 250, y: idx * 100 },
+        position: { x: step.x || 250, y: step.y || idx * 100 },
         type: step.type === 'condition' ? 'condition' : step.type === 'end_flow' ? 'end' : 'text',
       }));
       (setNodes as any)(newNodes);
+    }
+    // Carrega as arestas do fluxo salvo (edges: {from, handle, to})
+    if (flow.edges && Array.isArray(flow.edges)) {
+      const newEdges = flow.edges.map((edge: any) => ({
+        id: `${edge.from}-${edge.to}-${edge.handle}`,
+        source: edge.from,
+        target: edge.to,
+        sourceHandle: edge.handle,
+      }));
+      (setEdges as any)(newEdges);
+    } else {
+      (setEdges as any)([]);
     }
     setTriggerConfig({
       postType: flow.trigger_type === 'reel_comment' ? 'reel' : 'post',
@@ -106,6 +118,13 @@ export default function AutomacaoPage() {
         id: n.id,
         type: n.type || 'text',
         content: n.data?.label || '',
+        x: Math.round(n.position?.x || 0),
+        y: Math.round(n.position?.y || 0),
+      })),
+      edges: edges.map((e: any) => ({
+        from: e.source,
+        handle: e.sourceHandle || 'next',
+        to: e.target,
       })),
       enabled: selectedFlow.enabled,
     };
@@ -236,7 +255,7 @@ export default function AutomacaoPage() {
         }
       />
 
-      <main style={{ display: 'flex', paddingLeft: '280px', height: 'calc(100vh - 120px)', backgroundColor: '#FAFAF8' }}>
+      <main style={{ display: 'flex', height: 'calc(100vh - 120px)', backgroundColor: '#FAFAF8' }}>
         {/* ESQUERDA: Meus funis */}
         <div
           style={{
