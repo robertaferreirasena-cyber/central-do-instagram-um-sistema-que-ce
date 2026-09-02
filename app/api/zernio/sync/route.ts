@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
                 {
                   zernio_conversa: conv.id,
                   zernio_account: account.account_id,
+                  account_id: 'default-account',
                   participant_id: conv.participantId,
                   participant_username: conv.participantUsername,
                   participant_name: conv.participantName,
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
                     .insert({
                       conversation_id: conversation.id,
                       id_externo: msg.id,
+                      account_id: 'default-account',
                       autor: msg.senderName,
                       direcao: msg.direction === 'incoming' ? 'in' : 'out',
                       content: msg.message || msg.content || '',
