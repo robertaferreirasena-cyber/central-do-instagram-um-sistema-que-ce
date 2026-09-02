@@ -123,12 +123,11 @@ export async function POST(req: NextRequest) {
                     .insert({
                       conversation_id: conversation.id,
                       id_externo: msg.id,
-                      account_id: 'default-account',
                       autor: msg.senderName,
                       direcao: msg.direction === 'incoming' ? 'in' : 'out',
                       content: msg.message || msg.content || '',
-                      media_url: storedMediaUrl,
-                      media_tipo: mediaType,
+                      media_url: storedMediaUrl || null,
+                      media_tipo: mediaType || null,
                       created_at: new Date(msg.createdAt),
                     });
 
