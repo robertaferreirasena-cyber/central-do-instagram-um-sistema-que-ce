@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { Archivo, JetBrains_Mono } from 'next/font/google';
 
 const archivo = Archivo({ subsets: ['latin'], weight: ['600', '800', '900'] });
@@ -13,6 +14,7 @@ interface SidebarProps {
 
 export function Sidebar({ brandName }: SidebarProps) {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
     { href: '/visao-geral', label: 'Visão geral', icon: '📊' },
@@ -29,6 +31,56 @@ export function Sidebar({ brandName }: SidebarProps) {
   };
 
   return (
+    <>
+      <style>{`
+        @media (max-width: 899px) {
+          aside {
+            transform: translateX(${isOpen ? '0' : '-280px'});
+            transition: transform 300ms ease;
+            z-index: 50;
+          }
+          .sidebar-backdrop {
+            display: ${isOpen ? 'block' : 'none'};
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+          }
+        }
+        @media (min-width: 900px) {
+          .sidebar-toggle {
+            display: none;
+          }
+          .sidebar-backdrop {
+            display: none !important;
+          }
+        }
+      `}</style>
+      {isOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      <button
+        className="sidebar-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          position: 'fixed',
+          top: '1rem',
+          left: '1rem',
+          zIndex: 60,
+          backgroundColor: '#0E2A2E',
+          color: '#FAFAF8',
+          border: '1px solid #1A3A40',
+          padding: '0.5rem',
+          cursor: 'pointer',
+          fontSize: '1.25rem',
+          display: 'none',
+        }}
+      >
+        ☰
+      </button>
     <aside
       style={{
         width: '280px',
@@ -156,5 +208,6 @@ export function Sidebar({ brandName }: SidebarProps) {
         </button>
       </div>
     </aside>
+    </>
   );
 }
