@@ -283,3 +283,38 @@ export class ZernioClient {
 }
 
 export const zernio = new ZernioClient();
+
+// C3: Resolver post/reel por URL e extrair media_id
+// Aceita https://www.instagram.com/p/SHORTCODE/ ou /reel/SHORTCODE/
+export async function resolvePostByUrl(
+  url: string
+): Promise<{ shortcode: string; media_id: string | null }> {
+  if (!url) {
+    return { shortcode: '', media_id: null };
+  }
+
+  // Extrair shortcode de diferentes formatos de URL
+  let shortcode = '';
+  const patterns = [
+    /instagram\.com\/p\/([A-Za-z0-9_-]+)/,      // /p/SHORTCODE/
+    /instagram\.com\/reel\/([A-Za-z0-9_-]+)/,   // /reel/SHORTCODE/
+    /instagram\.com\/reels\/([A-Za-z0-9_-]+)/,  // /reels/SHORTCODE/
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      shortcode = match[1];
+      break;
+    }
+  }
+
+  if (!shortcode) {
+    return { shortcode: '', media_id: null };
+  }
+
+  // TODO: Integrar com Zernio para resolver shortcode → media_id via API
+  // Por enquanto, retorna shortcode como proxy para media_id
+  // Zernio teria um endpoint tipo GET /medias/resolve?shortcode=XXX
+  return { shortcode, media_id: null };
+}
