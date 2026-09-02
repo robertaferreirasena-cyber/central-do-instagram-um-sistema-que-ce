@@ -180,16 +180,5 @@
     color: #D6F24B !important;
   }
 
-  /* Layout responsivo */
-  [role="main"],
-  main {
-    margin-left: 280px;
-  }
-
-  @media (max-width: 899px) {
-    [role="main"],
-    main {
-      margin-left: 0;
-    }
-  }
+  /* Layout responsivo — o offset da sidebar é aplicado só no [data-role=content] (layout.tsx) */
 }
