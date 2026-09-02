@@ -1,5 +1,9 @@
 import { supabase } from './db';
 
+// Constantes de tenant — fonte única de verdade
+export const TENANT_TEXT = 'default-account'; // usado por zernio_conversations, flows, content_templates
+export const BRAIN_ACCOUNT = 'iaclub-default'; // usado por brain
+
 // As tabelas de CONTEUDO (content_briefs, content_calendar_items, content_campaigns,
 // media_library) usam account_id UUID com FK para instagram_accounts(id) — diferente do
 // tenant TEXT 'default-account' usado por zernio/flows/templates. Este helper resolve o
