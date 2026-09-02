@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Brain, loadBrain, updateBrain, initBrain, computeScore } from '@/lib/brain';
+import { Brain, computeScore } from '@/lib/brain';
 import BrainSidebar from '@/components/brain/BrainSidebar';
 import BrainEditor from '@/components/brain/BrainEditor';
 import BrainStats from '@/components/brain/BrainStats';
@@ -36,37 +36,50 @@ export default function BrainPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!accountId) return;
-
     async function loadBrainData() {
       setLoading(true);
-      const data = await loadBrain(accountId);
-      if (!data) {
-        // Inicializar brain se não existir
-        const initialized = await initBrain(accountId);
-        setBrain(initialized);
-      } else {
-        setBrain(data);
+      try {
+        const res = await fetch(`/api/brain?account_id=${accountId || 'iaclub-default'}`);
+        if (res.ok) {
+          const { data } = await res.json();
+          setBrain(data);
+        } else {
+          setBrain(null);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar brain:', err);
+        setBrain(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     loadBrainData();
   }, [accountId]);
 
   const handleSectionChange = async (sectionKey: SectionKey, updates: any) => {
-    if (!brain || !accountId) return;
+    if (!brain) return;
 
     setSaving(true);
-    const newSecoes = {
-      [sectionKey]: updates,
-    };
+    try {
+      const res = await fetch('/api/brain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId || 'iaclub-default',
+          secoes: { [sectionKey]: updates },
+        }),
+      });
 
-    const updated = await updateBrain(accountId, newSecoes);
-    if (updated) {
-      setBrain(updated);
+      if (res.ok) {
+        const { data } = await res.json();
+        setBrain(data);
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar brain:', err);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleSeedIaClub = async () => {
@@ -81,8 +94,11 @@ export default function BrainPage() {
       });
 
       if (res.ok) {
-        const newBrain = await loadBrain(accountId);
-        if (newBrain) setBrain(newBrain);
+        const brainRes = await fetch(`/api/brain?account_id=${accountId || 'iaclub-default'}`);
+        if (brainRes.ok) {
+          const { data } = await brainRes.json();
+          setBrain(data);
+        }
         alert('Brain seedado com sucesso!');
       }
     } catch (err) {
