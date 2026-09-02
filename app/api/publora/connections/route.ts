@@ -36,10 +36,10 @@ export async function GET(req: NextRequest) {
 
     // Normalizar contas para formato esperado
     // Extrai plataforma do platformId (ex: "instagram--username" -> "instagram")
-    const connections = Array.isArray(data) ? data : data.data || [];
+    const connections = Array.isArray(data) ? data : (data.connections || data.data || []);
     const normalized = connections.map((conn: any) => {
       const platformId = conn.platformId || '';
-      const platform = platformId.split('--')[0] || '';
+      const platform = platformId.split('-')[0] || '';
       return {
         id: conn.id,
         platform: platform || 'unknown',
