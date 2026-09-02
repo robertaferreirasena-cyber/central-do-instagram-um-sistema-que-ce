@@ -392,6 +392,13 @@ export default function InboxPage() {
             {/* Botões de Ação */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <button
+                onClick={() => {
+                  if (!selectedConversation) return;
+                  const name = selectedConversation.participant_name || selectedConversation.participant_username || 'Contato';
+                  const message = `Lead: ${name}\nÚltima mensagem: ${selectedConversation.last_message || 'Nenhuma'}\nInteresse: ${selectedConversation.main_interest || 'Não informado'}`;
+                  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                  window.open(whatsappUrl, '_blank');
+                }}
                 style={{
                   width: '100%',
                   backgroundColor: '#D6F24B',
