@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadBrain, updateBrain, initBrain, Brain, BrainSection } from '@/lib/brain';
+import { BRAIN_ACCOUNT } from '@/lib/tenant';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const accountId = searchParams.get('account_id') || 'iaclub-default';
+    const accountId = searchParams.get('account_id') || BRAIN_ACCOUNT;
 
     const brain = await loadBrain(accountId);
 
