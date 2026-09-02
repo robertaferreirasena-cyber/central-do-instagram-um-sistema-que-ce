@@ -1,30 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, dbQuery } from '@/lib/db';
 import { mapDirectProToFlow } from '@/lib/flowImport';
-import fs from 'fs';
-import path from 'path';
+import fluxo01 from '@/data/directpro-fluxos/01-isca-digital.json';
+import fluxo02 from '@/data/directpro-fluxos/02-lista-de-espera.json';
+import fluxo03 from '@/data/directpro-fluxos/03-cupom-primeira-compra.json';
+import fluxo04 from '@/data/directpro-fluxos/04-qualificacao-de-lead.json';
+import fluxo05 from '@/data/directpro-fluxos/05-menu-do-story.json';
+import fluxo06 from '@/data/directpro-fluxos/06-objecao-de-preco.json';
+import fluxo07 from '@/data/directpro-fluxos/07-agendamento.json';
+import fluxo08 from '@/data/directpro-fluxos/08-aula-ao-vivo.json';
+import fluxo09 from '@/data/directpro-fluxos/09-atendimento-24h.json';
+import fluxo10 from '@/data/directpro-fluxos/10-quiz-de-segmentacao.json';
 
-const DIRECTPRO_FLOWS_DIR = path.join(process.cwd(), 'Base de Conhecimento', 'directpro-fluxos');
-
-async function readDirectProFlows() {
+function readDirectProFlows() {
   const flows = [];
+  const packages = [fluxo01, fluxo02, fluxo03, fluxo04, fluxo05, fluxo06, fluxo07, fluxo08, fluxo09, fluxo10];
 
-  try {
-    const files = fs.readdirSync(DIRECTPRO_FLOWS_DIR).filter((f) => f.endsWith('.json'));
-
-    for (const file of files) {
-      if (file === 'LEIA-ME.md' || file === '00-pacote-completo.json') continue;
-
-      const filePath = path.join(DIRECTPRO_FLOWS_DIR, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const data = JSON.parse(content);
-
-      if (data.fluxos && Array.isArray(data.fluxos)) {
-        flows.push(...data.fluxos);
-      }
+  for (const pkg of packages) {
+    if ((pkg as any).fluxos && Array.isArray((pkg as any).fluxos)) {
+      flows.push(...(pkg as any).fluxos);
     }
-  } catch (error) {
-    console.error('Erro ao ler fluxos DirectPro:', error);
   }
 
   return flows;
@@ -32,7 +27,7 @@ async function readDirectProFlows() {
 
 export async function POST(request: NextRequest) {
   try {
-    const directProFlows = await readDirectProFlows();
+    const directProFlows = readDirectProFlows();
 
     if (directProFlows.length === 0) {
       return NextResponse.json(
@@ -46,7 +41,7 @@ export async function POST(request: NextRequest) {
     for (const directProFlow of directProFlows) {
       const mappedFlow = mapDirectProToFlow(directProFlow);
 
-      // Verifica se já existe um fluxo com esse nome
+      // Verifica se já existe um fluxo com esse nome (dedup)
       const { data: existing } = await dbQuery(() =>
         supabase
           .from('flows')
@@ -61,7 +56,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Cria novo fluxo
+      // Cria novo fluxo com edges
       const { data: newFlow } = await dbQuery(() =>
         supabase
           .from('flows')
@@ -73,6 +68,7 @@ export async function POST(request: NextRequest) {
               trigger_value: mappedFlow.trigger_value,
               match_mode: mappedFlow.match_mode,
               steps: mappedFlow.steps,
+              edges: mappedFlow.edges,
               enabled: mappedFlow.enabled,
               priority: mappedFlow.priority,
               cooldown_minutes: 5,
