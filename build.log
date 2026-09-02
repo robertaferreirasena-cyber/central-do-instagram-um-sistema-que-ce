@@ -1,0 +1,77 @@
+﻿
+> central-do-instagram-um-sistema-que-ce@0.1.0 build
+> next build
+
+▲ Next.js 16.3.3 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 45ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.0s
+  Running TypeScript ...
+  Finished TypeScript in 6.3s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/53) ...
+  Generating static pages using 11 workers (13/53) 
+  Generating static pages using 11 workers (26/53) 
+  Generating static pages using 11 workers (39/53) 
+✓ Generating static pages using 11 workers (53/53) in 718ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /analise
+├ ƒ /api/agente/seed-iaclub
+├ ƒ /api/agente/sugestoes
+├ ƒ /api/agente/toggle
+├ ƒ /api/brain/seed-iaclub
+├ ƒ /api/campaigns
+├ ƒ /api/content/briefs
+├ ƒ /api/content/briefs/%5Bid%5D
+├ ƒ /api/content/briefs/%5Bid%5D/approve
+├ ƒ /api/content/generate
+├ ƒ /api/content/plan
+├ ƒ /api/content/templates
+├ ƒ /api/content/templates/seed-iaclub
+├ ƒ /api/flows
+├ ƒ /api/flows/import-directpro
+├ ƒ /api/flows/run
+├ ƒ /api/instagram/agentes
+├ ƒ /api/instagram/analytics
+├ ƒ /api/instagram/attribution
+├ ƒ /api/instagram/automacao
+├ ƒ /api/instagram/conversa-atendimento
+├ ƒ /api/instagram/funnels
+├ ƒ /api/instagram/leads
+├ ƒ /api/instagram/leads/%5Bid%5D
+├ ƒ /api/instagram/messages
+├ ƒ /api/instagram/pendentes
+├ ƒ /api/instagram/sellers
+├ ƒ /api/knowledge-base
+├ ƒ /api/media/upload
+├ ƒ /api/publora/connections
+├ ƒ /api/publora/publish
+├ ƒ /api/publora/status
+├ ƒ /api/queue/tick
+├ ƒ /api/webhook/zernio
+├ ƒ /api/zernio/sync
+├ ƒ /api/zernio/webhook-register
+├ ○ /automacao
+├ ○ /brain
+├ ○ /calendario
+├ ○ /content
+├ ○ /content/create
+├ ○ /content/modelos
+├ ○ /inbox
+├ ○ /instagram
+├ ○ /inteligencia
+├ ○ /knowledge-base
+├ ○ /publicacoes
+├ ○ /settings
+└ ○ /visao-geral
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
