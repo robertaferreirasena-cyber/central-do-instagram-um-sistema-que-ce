@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import PlanejadorConteudo from '@/components/planejador-conteudo';
 import { Archivo } from 'next/font/google';
 
 const archivo = Archivo({ subsets: ['latin'], weight: ['600', '800', '900'] });
@@ -17,6 +18,7 @@ export default function ConteudoPage() {
   const [selectedTemplate, setSelectedTemplate] = useState('carousel');
   const [currentSlide, setCurrentSlide] = useState(1);
   const [totalSlides] = useState(7);
+  const [showPlanejador, setShowPlanejador] = useState(false);
   const [iaSuggestion, setIaSuggestion] = useState({
     objetivo: 'Gerar leads',
     tom: 'Direto e humano',
@@ -36,11 +38,23 @@ export default function ConteudoPage() {
             <button style={{ backgroundColor: 'transparent', border: '1px solid #0E2A2E', color: '#0E2A2E', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
               Salvar rascunho
             </button>
+            <button
+              onClick={() => setShowPlanejador(true)}
+              style={{ backgroundColor: '#29b6ff', color: '#070d18', padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}
+            >
+              📅 Gerar plano
+            </button>
             <button style={{ backgroundColor: '#D6F24B', color: '#0E2A2E', padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
               Gerar com IA
             </button>
           </div>
         }
+      />
+
+      <PlanejadorConteudo
+        isOpen={showPlanejador}
+        onClose={() => setShowPlanejador(false)}
+        accountId="default-account"
       />
 
       <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '240px 1fr 280px', gap: '2rem' }}>
