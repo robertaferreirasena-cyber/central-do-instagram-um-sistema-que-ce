@@ -2,35 +2,41 @@
 // Docs: https://docs.zernio.com
 // Auth: Bearer token
 
-interface ZernioMessage {
+export interface ZernioAccount {
+  _id: string;
+  platform: string;
+  username: string;
+}
+
+export interface ZernioProfile {
+  id: string;
+  name: string;
+  accounts: ZernioAccount[];
+}
+
+export interface ZernioConversation {
+  id: string;
+  participant_username: string;
+  last_message: string;
+  last_message_at: string;
+  platform: string;
+  unread_count: number;
+}
+
+export interface ZernioMessage {
   id: string;
   conversation_id: string;
   sender_username: string;
-  sender_name?: string;
   content: string;
-  platform: 'instagram' | 'facebook' | 'whatsapp' | 'twitter';
-  interaction_type: 'dm' | 'comment';
-  created_at: string;
-}
-
-interface ZernioSendMessageRequest {
-  conversation_id: string;
-  content: string;
-  platform: 'instagram' | 'facebook' | 'whatsapp' | 'twitter';
-}
-
-interface ZernioSendMessageResponse {
-  id: string;
-  status: 'sent' | 'failed';
-  created_at: string;
-  error?: string;
-}
-
-interface ZernioProfile {
-  id: string;
-  platform_username: string;
   platform: string;
-  connected: boolean;
+  created_at: string;
+  message_type: string;
+}
+
+export interface ZernioMessageResponse {
+  id: string;
+  status: string;
+  created_at: string;
 }
 
 const ZERNIO_BASE_URL = process.env.ZERNIO_BASE_URL || 'https://zernio.com/api/v1';
@@ -48,17 +54,22 @@ export class ZernioClient {
     this.baseUrl = ZERNIO_BASE_URL;
   }
 
-  async getProfiles(): Promise<{ data: ZernioProfile[] | null; error: string | null }> {
+  private getHeaders(): HeadersInit {
+    return {
+      Authorization: `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async getAccounts(): Promise<{ data: ZernioAccount[] | null; error: string | null }> {
     if (!this.apiKey) {
-      return { data: null, error: 'ZERNIO_API_KEY não configurada. Conecte a Zernio nas configurações.' };
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/profiles`, {
+      const response = await fetch(`${this.baseUrl}/accounts`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) {
@@ -66,31 +77,92 @@ export class ZernioClient {
       }
 
       const result = await response.json();
-      return { data: result.data || [], error: null };
+      return { data: result.accounts || [], error: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return { data: null, error: message };
     }
   }
 
-  async sendMessage(
-    req: ZernioSendMessageRequest
-  ): Promise<{ data: ZernioSendMessageResponse | null; error: string | null }> {
+  async getProfiles(): Promise<{ data: ZernioProfile[] | null; error: string | null }> {
     if (!this.apiKey) {
       return { data: null, error: 'ZERNIO_API_KEY não configurada' };
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/inbox/conversations/${req.conversation_id}/messages`, {
+      const response = await fetch(`${this.baseUrl}/profiles`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      return { data: result.profiles || [], error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
+    }
+  }
+
+  async listConversations(): Promise<{ data: ZernioConversation[] | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      return { data: result.conversations || [], error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
+    }
+  }
+
+  async getMessages(conversationId: string): Promise<{ data: ZernioMessage[] | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}/messages`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      return { data: result.messages || [], error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
+    }
+  }
+
+  async sendMessage(conversationId: string, content: string): Promise<{ data: ZernioMessageResponse | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}/messages`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: req.content,
-          platform: req.platform,
-        }),
+        headers: this.getHeaders(),
+        body: JSON.stringify({ content }),
       });
 
       if (!response.ok) {
@@ -106,16 +178,52 @@ export class ZernioClient {
     }
   }
 
-  // Webhook handler para processar eventos de Zernio
-  async processWebhookEvent(event: any): Promise<{ success: boolean; error?: string }> {
+  async replyComment(postId: string, commentId: string, content: string): Promise<{ data: any | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
     try {
-      // Validar assinatura do webhook (se Zernio exigir)
-      // Por enquanto, apenas logar o evento
-      console.log('Zernio webhook event:', event);
-      return { success: true };
+      const response = await fetch(`${this.baseUrl}/inbox/comments/${postId}/${commentId}/private-reply`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        return { data: null, error: `Zernio error: ${response.status} ${error}` };
+      }
+
+      const data = await response.json();
+      return { data, error: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      return { success: false, error: message };
+      return { data: null, error: message };
+    }
+  }
+
+  async markRead(conversationId: string): Promise<{ data: any | null; error: string | null }> {
+    if (!this.apiKey) {
+      return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}/read`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ read: true }),
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Zernio error: ${response.status}` };
+      }
+
+      const data = await response.json();
+      return { data, error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: message };
     }
   }
 }
