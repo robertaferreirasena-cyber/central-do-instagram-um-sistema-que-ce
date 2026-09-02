@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
+import { TENANT_TEXT } from '@/lib/tenant';
 
 interface UpcomingPost {
   id: string;
@@ -53,14 +54,14 @@ export default function DashboardPage() {
       setLoading(true);
 
       // Load overview (contagens reais do Supabase)
-      const overviewRes = await fetch('/api/dashboard/overview?account_id=default-account');
+      const overviewRes = await fetch(`/api/dashboard/overview?account_id=${TENANT_TEXT}`);
       if (overviewRes.ok) {
         const overviewData = await overviewRes.json();
         setOverview(overviewData.data || null);
       }
 
       // Load upcoming posts
-      const briefsRes = await fetch('/api/content/briefs?account_id=default-account');
+      const briefsRes = await fetch(`/api/content/briefs?account_id=${TENANT_TEXT}`);
       if (briefsRes.ok) {
         const data = await briefsRes.json();
         const briefs = Array.isArray(data.data) ? data.data : [];
@@ -75,7 +76,7 @@ export default function DashboardPage() {
       }
 
       // Load conversations
-      const convRes = await fetch('/api/instagram/conversa-atendimento?account_id=default-account');
+      const convRes = await fetch(`/api/instagram/conversa-atendimento?account_id=${TENANT_TEXT}`);
       if (convRes.ok) {
         const data = await convRes.json();
         const convs = Array.isArray(data.data) ? data.data : [];
@@ -84,7 +85,7 @@ export default function DashboardPage() {
       }
 
       // Load funnels
-      const funnelsRes = await fetch('/api/instagram/funnels?account_id=default-account');
+      const funnelsRes = await fetch(`/api/instagram/funnels?account_id=${TENANT_TEXT}`);
       if (funnelsRes.ok) {
         const data = await funnelsRes.json();
         const funns = Array.isArray(data.data) ? data.data : [];
@@ -128,7 +129,7 @@ export default function DashboardPage() {
         }
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', width: '100%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
           {/* Próximas publicações */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem', gridColumn: 'span 1' }}>
