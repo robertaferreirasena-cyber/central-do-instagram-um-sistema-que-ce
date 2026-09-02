@@ -40,11 +40,14 @@ Seja conciso e orientado para venda/engajamento.`,
       0.7
     );
 
+    // Se a IA não estiver disponível (sem modelo/erro), usa fallback determinístico
     if (!response.success) {
-      return NextResponse.json(
-        { error: response.error || 'Erro ao gerar conteúdo' },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: true,
+        fallback: true,
+        aviso: response.error || 'IA indisponível — gerado por modelo determinístico',
+        data: fallbackBrief(type, theme),
+      });
     }
 
     let generated;
@@ -53,10 +56,13 @@ Seja conciso e orientado para venda/engajamento.`,
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       generated = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
     } catch (e) {
-      return NextResponse.json(
-        { error: 'Erro ao processar resposta da IA' },
-        { status: 500 }
-      );
+      // Resposta veio, mas não era JSON válido: cai no fallback em vez de errar
+      return NextResponse.json({
+        success: true,
+        fallback: true,
+        aviso: 'Resposta da IA fora do formato — gerado por modelo determinístico',
+        data: fallbackBrief(type, theme),
+      });
     }
 
     return NextResponse.json({
@@ -95,4 +101,43 @@ Retorne um JSON com:
   "hashtags": ["tag1", "tag2", "tag3", "tag4"],
   "cta": "Call-to-action explícito"
 }`;
+}
+
+// Fallback determinístico: gera um brief coerente a partir do tema, sem depender de IA.
+function fallbackBrief(type: ContentType, theme: string) {
+  const t = (theme || '').trim();
+  const temaCurto = t.charAt(0).toUpperCase() + t.slice(1);
+  const formato =
+    {
+      [ContentType.FEED]: 'post no feed',
+      [ContentType.REEL]: 'Reel',
+      [ContentType.STORY]: 'sequência de stories',
+      [ContentType.CAROUSEL]: 'carrossel',
+    }[type] || 'post';
+
+  const palavras = t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter((p) => p.length > 3)
+    .slice(0, 4);
+  const hashtags = Array.from(
+    new Set([...palavras.map((p) => '#' + p), '#marketingdigital', '#instagram', '#iaparanegocios', '#conteudo'])
+  ).slice(0, 6);
+
+  return {
+    idea: `${temaCurto}: mostre na prática, com um exemplo real, por que isso importa para quem acompanha.`,
+    roteiro:
+      `Gancho: uma dor/pergunta sobre "${t}".\n` +
+      `Desenvolvimento: 3 pontos objetivos (o quê, por que, como aplicar hoje).\n` +
+      `Fechamento: convite para a próxima ação.`,
+    caption:
+      `${temaCurto} 👇\n\n` +
+      `A maioria trava aqui — e não precisava. Separei o essencial pra você aplicar ainda hoje, sem enrolação.\n\n` +
+      `Salva esse ${formato} pra não perder e me conta nos comentários: qual parte você vai testar primeiro?`,
+    hashtags,
+    cta: 'Comenta LINK que eu te mando o passo a passo no direct',
+  };
 }
