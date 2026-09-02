@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { getContentAccountId } from '@/lib/tenant';
 import { ApiResponse } from '@/types';
 
 interface CalendarItem {
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const accountId = req.nextUrl.searchParams.get('account_id') || 'default-account';
+    const accountId = await getContentAccountId();
     const from = req.nextUrl.searchParams.get('from');
     const to = req.nextUrl.searchParams.get('to');
 
