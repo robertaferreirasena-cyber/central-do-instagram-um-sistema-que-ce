@@ -6,9 +6,11 @@ import { PageHeader } from '@/components/PageHeader';
 export default function PublicacoesPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'published' | 'scheduled' | 'draft'>('all');
+  const [connections, setConnections] = useState<any[]>([]);
 
   useEffect(() => {
     loadPosts();
+    loadConnections();
   }, []);
 
   const loadPosts = async () => {
@@ -21,6 +23,18 @@ export default function PublicacoesPage() {
       }
     } catch (error) {
       console.error('Erro:', error);
+    }
+  };
+
+  const loadConnections = async () => {
+    try {
+      const res = await fetch('/api/publora/connections');
+      if (res.ok) {
+        const data = await res.json();
+        setConnections(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar contas:', error);
     }
   };
 
@@ -71,6 +85,27 @@ export default function PublicacoesPage() {
       />
 
       <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto' }}>
+        {/* Contas Conectadas */}
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', padding: '1.5rem', marginBottom: '2rem' }}>
+          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', color: '#7A8B84', letterSpacing: '0.1em' }}>
+            Contas conectadas
+          </h3>
+          {connections.length === 0 ? (
+            <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhuma conta conectada na Publora</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              {connections.map((conn) => (
+                <div key={conn.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#F8F8F8', padding: '0.75rem 1rem', borderRadius: '0' }}>
+                  <span style={{ fontSize: '1rem' }}>
+                    {conn.platform === 'instagram' ? '📷' : conn.platform === 'tiktok' ? '🎵' : conn.platform === 'youtube' ? '▶️' : '📱'}
+                  </span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E' }}>@{conn.username}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Filtros */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
           {(['all', 'published', 'scheduled', 'draft'] as const).map((f) => (
