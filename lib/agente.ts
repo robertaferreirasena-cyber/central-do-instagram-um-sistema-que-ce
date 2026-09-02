@@ -1,4 +1,5 @@
 import { supabase } from './db';
+import { loadBrain, buildSystemPrompt, checkViolations, logViolation } from './brain';
 
 // ============================================================================
 // NVIDIA GRÁTIS - CASCATA DE MODELOS
@@ -110,14 +111,38 @@ async function chamaNvidia(
 }
 
 // ============================================================================
-// SYSTEM PROMPT (ORDEM IMPORTA)
+// SYSTEM PROMPT (ORDEM IMPORTA) - COM BRAIN SYSTEM SE DISPONÍVEL
 // ============================================================================
 
 export async function agenteSysPrompt(
   agenteFuncao: string,
   agentePessoa: string,
-  agenteInstrucoes: string
+  agenteInstrucoes: string,
+  accountId?: string
 ): Promise<string> {
+  // Tentar carregar Brain (IA Club, por exemplo)
+  let brainSystemPrompt = '';
+  if (accountId) {
+    const brain = await loadBrain(accountId);
+    if (brain) {
+      brainSystemPrompt = buildSystemPrompt(brain);
+    }
+  }
+
+  // Se tem Brain, usar; senão, fallback para a estrutura anterior
+  if (brainSystemPrompt) {
+    const extra = agenteInstrucoes
+      ? `==== INSTRUÇÕES DO AGENTE ====\n${agenteInstrucoes}`
+      : '';
+    return `${brainSystemPrompt}
+
+==== RESPOSTA ====
+Responda APENAS a mensagem final do usuário. Resposta CURTA, em pt-BR, SEM raciocínio, máx 600 caracteres.
+
+${extra}`;
+  }
+
+  // FALLBACK: Estrutura anterior (compatibilidade com agentes sem Brain)
   const baseConhecimento = await lerBaseConhecimento();
   const regrasComercias = obterRegrasComercias();
 
