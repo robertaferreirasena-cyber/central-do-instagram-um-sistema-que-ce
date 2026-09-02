@@ -14,9 +14,10 @@ interface UpcomingPost {
 
 interface Conversation {
   id: string;
-  lead_name: string;
+  participant_name?: string;
+  participant_username?: string;
   last_message: string;
-  updated_at: string;
+  updated_time: string;
 }
 
 interface Funnel {
@@ -26,12 +27,21 @@ interface Funnel {
   updated_at: string;
 }
 
+interface OverviewData {
+  conversas_total: number;
+  conversas_aguardando_humano: number;
+  revisoes_pendentes: number;
+  publicacoes_agenda: number;
+  funis_ativos: number;
+}
+
 export default function DashboardPage() {
   const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPost[]>([]);
   const [pendingReview, setPendingReview] = useState<any[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationCount, setConversationCount] = useState<number>(0);
   const [funnels, setFunnels] = useState<Funnel[]>([]);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +51,13 @@ export default function DashboardPage() {
   const loadData = async () => {
     try {
       setLoading(true);
+
+      // Load overview (contagens reais do Supabase)
+      const overviewRes = await fetch('/api/dashboard/overview?account_id=default-account');
+      if (overviewRes.ok) {
+        const overviewData = await overviewRes.json();
+        setOverview(overviewData.data || null);
+      }
 
       // Load upcoming posts
       const briefsRes = await fetch('/api/content/briefs?account_id=default-account');
@@ -116,7 +133,14 @@ export default function DashboardPage() {
           {/* Próximas publicações */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem', gridColumn: 'span 1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>📅 Próximas publicações</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>📅 Próximas publicações</h3>
+                {overview && overview.publicacoes_agenda > 0 && (
+                  <span style={{ fontSize: '0.875rem', color: '#D6F24B', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontWeight: 600 }}>
+                    {overview.publicacoes_agenda}
+                  </span>
+                )}
+              </div>
               <Link href="/calendario" style={{ fontSize: '0.75rem', color: '#D6F24B', textDecoration: 'none', fontWeight: 600 }}>
                 Ver calendário
               </Link>
@@ -152,24 +176,29 @@ export default function DashboardPage() {
 
           {/* Revisão pendente */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>👁️ Revisão pendente</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>👁️ Revisão pendente</h3>
+              {overview && overview.revisoes_pendentes > 0 && (
+                <span style={{ fontSize: '0.875rem', color: '#D6F24B', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontWeight: 600 }}>
+                  {overview.revisoes_pendentes}
+                </span>
+              )}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {pendingReview.length === 0 ? (
+              {(overview?.revisoes_pendentes || 0) === 0 ? (
                 <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhuma revisão pendente</p>
               ) : (
-                pendingReview.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '9999px', backgroundColor: '#D6F24B', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#0E2A2E' }}>
-                        {item.created_by || 'Usuário'}
-                      </p>
-                    </div>
-                    <span style={{ backgroundColor: '#FFE6CC', color: '#8B6B2D', padding: '0.25rem 0.5rem', fontSize: '0.65rem', fontWeight: 600, borderRadius: 0 }}>
-                      Aguardando
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '9999px', backgroundColor: '#D6F24B', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#0E2A2E' }}>
+                      {overview?.revisoes_pendentes} item{(overview?.revisoes_pendentes || 0) > 1 ? 's' : ''} aguardando
+                    </p>
                   </div>
-                ))
+                  <span style={{ backgroundColor: '#FFE6CC', color: '#8B6B2D', padding: '0.25rem 0.5rem', fontSize: '0.65rem', fontWeight: 600, borderRadius: 0 }}>
+                    Urgente
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -178,14 +207,14 @@ export default function DashboardPage() {
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>
-                💬 Conversas {conversationCount > 0 && <span style={{ fontSize: '0.875rem', color: '#D6F24B', marginLeft: '0.5rem', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px' }}>({conversationCount})</span>}
+                💬 Conversas {(overview?.conversas_total || 0) > 0 && <span style={{ fontSize: '0.875rem', color: '#D6F24B', marginLeft: '0.5rem', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px' }}>({overview?.conversas_aguardando_humano})</span>}
               </h3>
               <Link href="/inbox" style={{ fontSize: '0.75rem', color: '#D6F24B', textDecoration: 'none', fontWeight: 600 }}>
                 Ver todas
               </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {conversationCount === 0 ? (
+              {(overview?.conversas_total || 0) === 0 ? (
                 <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhuma conversa</p>
               ) : (
                 conversations.map((conv) => (
@@ -193,7 +222,7 @@ export default function DashboardPage() {
                     <div style={{ width: '32px', height: '32px', borderRadius: '9999px', backgroundColor: '#E2E2DE', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#0E2A2E' }}>
-                        {conv.lead_name || 'Contato'}
+                        {conv.participant_name || conv.participant_username || 'Contato'}
                       </p>
                       <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#7A8B84', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {conv.last_message || 'Sem mensagens'}
@@ -210,21 +239,21 @@ export default function DashboardPage() {
 
           {/* Funis ativos */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E2DE', borderRadius: 0, padding: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>🎯 Funis ativos</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#0E2A2E' }}>🎯 Funis ativos</h3>
+              {overview && overview.funis_ativos > 0 && (
+                <span style={{ fontSize: '0.875rem', color: '#D6F24B', backgroundColor: '#0E2A2E', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontWeight: 600 }}>
+                  {overview.funis_ativos}
+                </span>
+              )}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {funnels.length === 0 ? (
-                <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhum funil configurado</p>
+              {(overview?.funis_ativos || 0) === 0 ? (
+                <p style={{ color: '#7A8B84', fontSize: '0.875rem', margin: 0 }}>Nenhum funil ativo</p>
               ) : (
-                funnels.map((funnel) => (
-                  <div key={funnel.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#0E2A2E' }}>
-                      {funnel.name}
-                    </p>
-                    <span style={{ backgroundColor: funnel.status === 'active' || funnel.status === 'Ativo' ? '#D6F24B' : '#E2E2DE', color: funnel.status === 'active' || funnel.status === 'Ativo' ? '#0E2A2E' : '#7A8B84', padding: '0.25rem 0.5rem', fontSize: '0.65rem', fontWeight: 600, borderRadius: 0 }}>
-                      {funnel.status === 'active' ? 'Ativo' : 'Em pausa'}
-                    </span>
-                  </div>
-                ))
+                <p style={{ color: '#2D7A1F', fontSize: '0.875rem', margin: 0, fontWeight: 600 }}>
+                  {overview?.funis_ativos} fluxo{(overview?.funis_ativos || 0) > 1 ? 's' : ''} operando
+                </p>
               )}
             </div>
           </div>
