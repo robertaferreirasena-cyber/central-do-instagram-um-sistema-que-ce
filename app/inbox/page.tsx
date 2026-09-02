@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { TENANT_TEXT } from '@/lib/tenant';
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -28,7 +29,7 @@ export default function InboxPage() {
   // Carregar conversas
   const loadConversations = async () => {
     try {
-      const res = await fetch('/api/instagram/conversa-atendimento?account_id=default-account');
+      const res = await fetch(`/api/instagram/conversa-atendimento?account_id=${TENANT_TEXT}`);
       if (res.ok) {
         const data = await res.json();
         setConversations(Array.isArray(data.data) ? data.data : []);
@@ -166,7 +167,7 @@ export default function InboxPage() {
         }
       />
 
-      <main style={{ paddingLeft: '280px', padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '320px 1fr 300px', gap: '2rem' }}>
+      <main style={{ padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '320px 1fr 300px', gap: '2rem', width: '100%' }}>
         {/* COLUNA ESQUERDA: Filtros e Lista de Conversas */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: 'fit-content', maxHeight: 'calc(100vh - 200px)' }}>
           {/* Filtros */}
