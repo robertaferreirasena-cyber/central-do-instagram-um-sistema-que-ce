@@ -2,9 +2,9 @@ import { supabase, dbQuery } from './db';
 
 export interface FlowStep {
   id: string;
-  type: 'text' | 'quick_replies' | 'media' | 'condition' | 'collect_data' | 'wait' | 'notify_admin' | 'end_flow';
+  type: 'text' | 'quick_replies' | 'media' | 'condition' | 'collect_data' | 'wait' | 'notify_admin' | 'end_flow' | 'follow_gate' | 'tag' | 'start';
   content?: string;
-  buttons?: { label: string; postback: string }[];
+  buttons?: { label: string; postback?: string; url?: string }[];
   field_name?: string;
   field_label?: string;
   yes_step?: string;
@@ -15,6 +15,8 @@ export interface FlowStep {
   media_url?: string;
   media_type?: string;
   tag_to_apply?: string;
+  x?: number;
+  y?: number;
 }
 
 export interface Flow {
@@ -210,6 +212,35 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
       case 'end_flow':
         newRun.status = 'completed';
         isRunning = false;
+        break;
+
+      case 'start':
+        // Start é um nó inicializador, apenas avança
+        currentStepIndex++;
+        break;
+
+      case 'follow_gate':
+        // Portão de seguidor: verifica se segue (simplificado, null = libera)
+        actions.push({
+          type: 'send_message',
+          text: step.content || '',
+          quick_replies: step.buttons || [],
+          is_private: true,
+        });
+        newRun.status = 'waiting';
+        newRun.current_step = currentStepIndex;
+        isRunning = false;
+        // Registra no contexto que aguarda verificação de follow
+        context._follow_gate_pending = true;
+        break;
+
+      case 'tag':
+        // Aplica etiqueta ao lead
+        actions.push({
+          type: 'apply_tag',
+          tag: step.tag_to_apply || '',
+        });
+        currentStepIndex++;
         break;
 
       default:
