@@ -447,3 +447,77 @@ export async function deletarAgente(id: number): Promise<boolean> {
 
   return true;
 }
+
+// ============================================================================
+// IA CLUB - AGENTE COM MODO TREINO (DEFAULT OFF)
+// ============================================================================
+
+export async function toggleAgenteAtivo(): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { data: current } = await supabase
+      .from('crm_config')
+      .select('value')
+      .eq('key', 'agente_ativo')
+      .single();
+
+    const newValue = current?.value === 'true' ? 'false' : 'true';
+
+    await supabase
+      .from('crm_config')
+      .update({ value: newValue })
+      .eq('key', 'agente_ativo');
+
+    return newValue === 'true';
+  } catch (error) {
+    console.error('Erro ao toggle agente:', error);
+    return false;
+  }
+}
+
+export async function getAgenteStatus(): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { data } = await supabase
+      .from('crm_config')
+      .select('value')
+      .eq('key', 'agente_ativo')
+      .single();
+
+    return data?.value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setConversationMode(
+  conversa_id: string,
+  mode: 'normal' | 'agente'
+): Promise<void> {
+  if (!supabase) return;
+
+  try {
+    const { data: existing } = await supabase
+      .from('conversation_modes')
+      .select('id')
+      .eq('conversa_id', conversa_id)
+      .single()
+      .catch(() => ({ data: null }));
+
+    if (existing) {
+      await supabase
+        .from('conversation_modes')
+        .update({ mode })
+        .eq('conversa_id', conversa_id);
+    } else {
+      await supabase.from('conversation_modes').insert({
+        conversa_id,
+        mode,
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao setar modo conversa:', error);
+  }
+}
