@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import PlanejadorConteudo from '@/components/planejador-conteudo';
+import TemplatePreview from '@/components/TemplatePreview';
 import { TENANT_TEXT } from '@/lib/tenant';
 import { Archivo } from 'next/font/google';
 
@@ -231,7 +232,14 @@ export default function ConteudoPage() {
                     position: 'relative',
                   }}
                 >
-                  <div style={{ width: '100%', height: '80px', backgroundColor: selectedTemplate === template.id ? '#0E2A2E' : '#E2E2DE', marginBottom: '0.75rem', borderRadius: 0 }} />
+                  <div style={{ width: '100%', marginBottom: '0.75rem', pointerEvents: 'none' }}>
+                    <TemplatePreview
+                      nome={template.nome || template.name || 'Modelo'}
+                      proporcao={template.proporcao || '4:5'}
+                      combinacao="editorial"
+                      miniatura={true}
+                    />
+                  </div>
                   <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: selectedTemplate === template.id ? '#0E2A2E' : '#0E2A2E' }}>
                     {template.nome || template.name || 'Modelo'}
                   </p>
@@ -264,7 +272,7 @@ export default function ConteudoPage() {
             </div>
 
             {/* Preview área */}
-            <div style={{ flex: 1, backgroundColor: '#0E2A2E', borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', padding: '1.5rem', overflowY: 'auto' }}>
+            <div style={{ flex: 1, backgroundColor: '#0E2A2E', borderRadius: 0, minHeight: '400px', padding: '1.5rem', overflowY: 'auto', textAlign: 'center', display: 'grid', placeItems: 'center' }}>
               {generated ? (
                 <div style={{ textAlign: 'center', color: '#FAFAF8', width: '100%' }}>
                   <p style={{ fontFamily: archivo.style.fontFamily, fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 1rem 0' }}>
@@ -281,13 +289,16 @@ export default function ConteudoPage() {
                   )}
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', color: '#FAFAF8' }}>
-                  <p style={{ fontFamily: archivo.style.fontFamily, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 1rem 0' }}>
-                    Seu conteúdo<br />precisa virar<br />conversa.
+                <div style={{ textAlign: 'center', color: '#FAFAF8', maxWidth: '420px' }}>
+                  <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.7rem', letterSpacing: '0.14em', color: '#D6F24B', textTransform: 'uppercase', margin: '0 0 1rem 0' }}>
+                    {templates.find((t) => t.id === selectedTemplate)?.proporcao || '4:5'} · {templates.find((t) => t.id === selectedTemplate)?.nome || 'Modelo'}
                   </p>
-                  <div style={{ width: '60px', height: '20px', backgroundColor: '#D6F24B', margin: '1rem auto' }} />
-                  <p style={{ fontSize: '0.75rem', color: '#A8BDB5', margin: '1.5rem 0 0 0' }}>
-                    Clique em "Gerar com IA" para começar
+                  <p style={{ fontFamily: archivo.style.fontFamily, fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 1rem 0', lineHeight: 1.05 }}>
+                    Seu conteúdo<br />precisa virar<br />conversa<span style={{ color: '#D6F24B' }}>.</span>
+                  </p>
+                  <div style={{ display: 'inline-block', width: '18px', height: '40px', backgroundColor: '#D6F24B', margin: '0.5rem auto 1.5rem' }} />
+                  <p style={{ fontSize: '0.8rem', color: '#A8BDB5', margin: 0, lineHeight: 1.5 }}>
+                    Ajuste os campos ao lado e clique em <strong style={{ color: '#FAFAF8' }}>Gerar com IA</strong> para preencher este modelo. A arte do modelo aparece na coluna Modelos e na Biblioteca.
                   </p>
                 </div>
               )}
