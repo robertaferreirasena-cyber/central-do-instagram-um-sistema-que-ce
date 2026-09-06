@@ -100,7 +100,13 @@ async function chamaNvidia(
       };
     }
 
-    const content = data.choices?.[0]?.message?.content || '';
+    // Alguns modelos (ex.: gpt-oss "reasoning") às vezes voltam content null/vazio —
+    // tratar como FALHA pra o cerebro cascatear pro próximo modelo em vez de devolver vazio.
+    const msg = data.choices?.[0]?.message || {};
+    const content = (msg.content || msg.reasoning_content || '').trim();
+    if (!content) {
+      return { success: false, error: 'empty content' };
+    }
     return { success: true, content };
   } catch (err) {
     return {
@@ -428,6 +434,19 @@ export interface Agent {
   funcao: string;
   instrucoes?: string;
   ativo: boolean;
+  // Cadastro completo (governança do agente)
+  objetivo?: string; // pré-atendimento | qualificação | suporte | comercial | encaminhamento
+  status?: string; // rascunho | em_teste | ativo | pausado
+  config?: {
+    tom_voz?: string;
+    fontes?: string[]; // brain, catalogo, faq, politicas, estoque
+    campos_coletar?: string[];
+    limite_mensagens?: number;
+    handoff?: string; // condições de transferência ao humano
+    horario?: string;
+    msg_indisponivel?: string;
+    fila_destino?: string;
+  };
 }
 
 export async function listarAgentes(): Promise<Agent[]> {

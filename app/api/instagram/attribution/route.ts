@@ -62,17 +62,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
+    // Nomes dos leads via LOOKUP manual (o PostgREST não tem os embeds registrados;
+    // antes o map lia event.leads?.nome que nunca era selecionado → sempre "N/A").
+    const leadIds = [...new Set((eventsData || []).map((e: any) => e.lead_id).filter(Boolean))];
+    const leadNome: Record<string, string> = {};
+    if (leadIds.length) {
+      const { data: leadsData } = await supabase.from('leads').select('id, nome').in('id', leadIds);
+      (leadsData || []).forEach((l: any) => { leadNome[String(l.id)] = l.nome; });
+    }
+    // Nomes dos funis via `flows` (a tabela viva de automação)
+    const funnelIds = [...new Set((eventsData || []).map((e: any) => e.funnel_id).filter(Boolean))];
+    const funnelNome: Record<string, string> = {};
+    if (funnelIds.length) {
+      const { data: flowsData } = await supabase.from('flows').select('id, nome').in('id', funnelIds);
+      (flowsData || []).forEach((f: any) => { funnelNome[String(f.id)] = f.nome; });
+    }
+
     const events = (eventsData || []).map((event: any) => ({
       id: event.id,
       lead_id: event.lead_id,
-      lead_nome: event.leads?.nome || 'N/A',
+      lead_nome: leadNome[String(event.lead_id)] || 'N/A',
       content_brief_id: event.content_brief_id,
       campaign_id: event.campaign_id,
-      campaign_nome: event.content_campaigns?.nome,
       automation_id: event.automation_id,
-      automation_nome: event.ig_automacoes?.nome,
       funnel_id: event.funnel_id,
-      funnel_nome: event.instagram_funnels?.nome,
+      funnel_nome: funnelNome[String(event.funnel_id)],
       order_id: event.order_id,
       hora: event.hora,
     }));
@@ -124,11 +138,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'lead_id e accountId obrigatórios' }, { status: 400 });
     }
 
+    // OBS: attribution_events NÃO tem coluna account_id no banco vivo — inserir causava erro.
     const { data, error } = await supabase
       .from('attribution_events')
       .insert([
         {
-          account_id: accountId,
           lead_id,
           content_brief_id,
           campaign_id,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { CURRENT_ACCOUNT_ID } from '@/lib/currentAccount';
 
 interface AnalyticsData {
   followers?: number;
@@ -73,7 +74,7 @@ export function AnalyticsTab() {
   async function fetchAnalytics() {
     setLoading(true);
     try {
-      const res = await fetch('/api/instagram/analytics');
+      const res = await fetch(`/api/instagram/analytics?accountId=${encodeURIComponent(CURRENT_ACCOUNT_ID)}`);
       const data = await res.json();
       if (data.success) {
         setAnalytics(data.analytics || {});

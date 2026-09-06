@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
       funcao: body.funcao,
       instrucoes: body.instrucoes || '',
       ativo: body.ativo !== false,
+      objetivo: body.objetivo || 'pre_atendimento',
+      status: body.status || 'rascunho',
+      config: body.config || {},
     };
 
     const criado = await criarAgente(agente);

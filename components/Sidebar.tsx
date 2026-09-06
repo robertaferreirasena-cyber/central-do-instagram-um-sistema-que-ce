@@ -22,14 +22,36 @@ export function Sidebar({ brandName }: SidebarProps) {
     { href: '/content/modelos', label: 'Biblioteca de modelos', icon: '🎨' },
     { href: '/calendario', label: 'Calendário', icon: '📅' },
     { href: '/publicacoes', label: 'Publicações', icon: '📱' },
+    { section: 'Central do Instagram' },
+    { href: '/inbox', label: 'Conversas', icon: '💬' },
+    { href: '/inteligencia', label: 'Aprovações', icon: '✅' },
     { href: '/automacao', label: 'Automação', icon: '⚙️' },
-    { href: '/inbox', label: 'Inbox', icon: '💬' },
-    { href: '/analise', label: 'Análise', icon: '📈' },
+    { href: '/instagram/agentes', label: 'Agentes', icon: '🤖' },
+    { href: '/instagram/leads', label: 'Leads', icon: '👥' },
+    { href: '/instagram/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/instagram/atribuicao', label: 'Atribuição', icon: '🎯' },
+    { section: 'Marca' },
     { href: '/brain', label: 'Brain System', icon: '🧠' },
+    { href: '/settings', label: 'Configurações', icon: '⚙️' },
   ];
 
+
+  // Todos os hrefs (sem query) — usado pra achar o match MAIS específico e evitar
+  // que /content e /content/modelos fiquem ambos ativos ao mesmo tempo.
+  const allHrefs = navItems
+    .filter((i): i is { href: string; label: string; icon: string } => 'href' in i)
+    .map((i) => i.href.split('?')[0]);
+
   const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(href + '/');
+    const path = href.split('?')[0];
+    if (pathname === path) return true;
+    if (pathname.startsWith(path + '/')) {
+      // ativo só se nenhum OUTRO item é um prefixo mais específico do pathname atual
+      return !allHrefs.some(
+        (h) => h !== path && h.startsWith(path + '/') && (pathname === h || pathname.startsWith(h + '/'))
+      );
+    }
+    return false;
   };
 
   return (
@@ -136,7 +158,24 @@ export function Sidebar({ brandName }: SidebarProps) {
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '1rem 0' }}>
-        {navItems.map((item) => {
+        {navItems.map((item, i) => {
+          if ('section' in item) {
+            return (
+              <div
+                key={`sec-${i}`}
+                style={{
+                  padding: '1rem 1rem 0.35rem',
+                  fontFamily: jetBrainsMono.style.fontFamily,
+                  fontSize: '0.65rem',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: '#5E756C',
+                }}
+              >
+                {item.section}
+              </div>
+            );
+          }
           const active = isActive(item.href);
           return (
             <Link

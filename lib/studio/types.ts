@@ -67,6 +67,13 @@ export interface Slide {
 
 export interface ProjectData {
   slides: Slide[];
+  // Conteúdo (roteiro) guardado SEPARADO do design (slides). Assim dá pra trocar de
+  // template/re-renderizar sem perder o texto gerado. Editar no editor preserva estas
+  // chaves (spread de data), o que evita apagar o roteiro ao salvar.
+  roteiro?: Record<string, unknown>[];
+  caption?: string;
+  hashtags?: string[];
+  estilo?: string;
 }
 
 export interface StudioProject {

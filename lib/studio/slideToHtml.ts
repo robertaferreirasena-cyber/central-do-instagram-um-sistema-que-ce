@@ -1,6 +1,6 @@
 ﻿import type { Slide, SlideElement, ElementStyles } from "./types";
 
-const GOOGLE_FONTS_IMPORT = `@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");`;
+const GOOGLE_FONTS_IMPORT = `@import url("https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Serif+Display:ital@0;1&family=Fraunces:opsz,wght,SOFT@9..144,400..900,0..100&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Inter+Tight:wght@600;800;900&family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500;700&family=Lato:wght@400;700;900&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;600;800&family=Sora:wght@400;600;700;800&family=Source+Serif+4:wght@400;600&family=Spectral:wght@400;600;700&display=swap");`;
 
 function stylesToCss(styles: ElementStyles): string {
   const css: Record<string, string | number> = {};

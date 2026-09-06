@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { zernio } from '@/lib/zernio';
 import { downloadMediaToStorage } from '@/lib/storage';
+import { upsertLeadFromConversation } from '@/lib/leadsPipeline';
 import { ApiResponse } from '@/types';
 
 // GET /api/cron/inbox - Cron para sincronizar inbox a cada 5 minutos
@@ -101,6 +102,11 @@ export async function GET(req: NextRequest) {
               console.warn(`Erro ao upsert conversa ${conv.id}:`, upsertError);
               continue;
             }
+
+            // ESPINHA: toda conversa sincronizada vira/atualiza um lead no CRM.
+            await upsertLeadFromConversation(conversation).catch((e) =>
+              console.warn(`Lead pipeline falhou p/ conversa ${conv.id}:`, e),
+            );
 
             // Sincronizar mensagens dessa conversa (sob demanda)
             const { data: messages, error: msgError } = await zernio.getMessages(conv.id, account.account_id, 50);

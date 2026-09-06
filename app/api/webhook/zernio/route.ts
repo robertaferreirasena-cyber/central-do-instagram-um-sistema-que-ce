@@ -5,7 +5,27 @@ import { downloadMediaToStorage } from '@/lib/storage';
 import { ApiResponse } from '@/types';
 import { processarComentario, processarStoryReply, type CommentPayload, type StoryReplyPayload } from '@/lib/instagram';
 import { autoResponder } from '@/lib/agente';
-import { matchFlows, getFlow, getOrCreateFlowRun, executeRun } from '@/lib/flowEngine';
+import { matchFlows, getFlow, getOrCreateFlowRun, executeRun, dispatchFlowActions, tryResumeFlow } from '@/lib/flowEngine';
+import { upsertLeadFromConversation } from '@/lib/leadsPipeline';
+
+// ESPINHA: todo engajamento (comentário/story/DM) vira/atualiza lead no CRM,
+// com origem e — quando veio de um fluxo — atribuição ao funil. Nunca envia nada.
+async function registrarLeadDoEvento(
+  parsed: { remetente_handle?: string; remetente_nome?: string; texto?: string; account_id?: string },
+  origem: string,
+  funnelId?: number,
+) {
+  if (!parsed.remetente_handle) return;
+  await upsertLeadFromConversation(
+    {
+      participant_username: parsed.remetente_handle,
+      participant_name: parsed.remetente_nome,
+      last_message: parsed.texto,
+      account_id: parsed.account_id,
+    },
+    { origem, funnelId },
+  ).catch((e) => console.warn('Lead pipeline (webhook) falhou:', e));
+}
 
 // POST - Webhook de Zernio (message.received, conversation.started, comment.received)
 export async function POST(req: NextRequest) {
@@ -85,6 +105,16 @@ export async function POST(req: NextRequest) {
 
             if (run) {
               const result = await executeRun(run, flow);
+              // ENVIA de verdade: enfileira as ações do fluxo (private_reply fura a
+              // janela 24h; comment_reply público). O envio real depende do drain (gate).
+              await dispatchFlowActions(result.actions, {
+                accountId: parsed.account_id,
+                triggerType: 'comment',
+                commentId: parsed.comment_id,
+                contactId: parsed.remetente_id,
+                flowId: flow.id,
+                runId: run.id,
+              }).catch((e) => console.warn('dispatch (comentário) falhou:', e));
               console.log(`✅ Fluxo ${flow.id} iniciado para comentário ${parsed.comment_id}`);
             }
           } catch (err) {
@@ -105,6 +135,9 @@ export async function POST(req: NextRequest) {
         author_username: parsed.remetente_handle || '',
         platform: parsed.platform,
       };
+
+      // ESPINHA: quem comentou vira lead, atribuído ao funil que casou (se houver).
+      await registrarLeadDoEvento(parsed, 'comentario', matchedFlows?.[0]?.id);
 
       await processarComentario(comentario);
       return NextResponse.json({ success: true, data: { comment: true } } as ApiResponse<any>);
@@ -128,6 +161,14 @@ export async function POST(req: NextRequest) {
 
               if (run) {
                 const result = await executeRun(run, flow);
+                await dispatchFlowActions(result.actions, {
+                  accountId: parsed.account_id,
+                  triggerType: 'story_reply',
+                  conversationId: parsed.conversation_id,
+                  contactId: parsed.remetente_id,
+                  flowId: flow.id,
+                  runId: run.id,
+                }).catch((e) => console.warn('dispatch (story) falhou:', e));
                 console.log(`✅ Fluxo ${flow.id} iniciado para story reply ${parsed.story_id}`);
               }
             } catch (err) {
@@ -139,7 +180,18 @@ export async function POST(req: NextRequest) {
 
       // C4: Se é DM direto (não story), procurar fluxos também
       if (!parsed.is_story_reply) {
-        const matchedFlows = await matchFlows('dm', parsed.texto);
+        // Primeiro: se a pessoa tem um fluxo EM ESPERA, o texto pode ser a resposta
+        // ao menu (clique no botão) → retoma o fluxo em vez de começar outro.
+        const retomado = await tryResumeFlow({
+          accountId: parsed.account_id,
+          contactId: parsed.remetente_id || '',
+          conversationId: parsed.conversation_id,
+          messageText: parsed.texto || '',
+        }).catch(() => ({ resumed: false }));
+        if (retomado.resumed) {
+          console.log(`↪️ Fluxo retomado (botão) para ${parsed.conversation_id}`);
+        }
+        const matchedFlows = retomado.resumed ? null : await matchFlows('dm', parsed.texto);
         if (matchedFlows && matchedFlows.length > 0) {
           console.log(`🎯 ${matchedFlows.length} fluxo(s) casa(m) com DM:`, parsed.conversation_id);
 
@@ -153,6 +205,14 @@ export async function POST(req: NextRequest) {
 
               if (run) {
                 const result = await executeRun(run, flow);
+                await dispatchFlowActions(result.actions, {
+                  accountId: parsed.account_id,
+                  triggerType: 'dm',
+                  conversationId: parsed.conversation_id,
+                  contactId: parsed.remetente_id,
+                  flowId: flow.id,
+                  runId: run.id,
+                }).catch((e) => console.warn('dispatch (DM) falhou:', e));
                 console.log(`✅ Fluxo ${flow.id} iniciado para DM ${parsed.conversation_id}`);
               }
             } catch (err) {
@@ -369,6 +429,11 @@ async function ingerirMensagem(parsed: ParsedEvent) {
       console.error('Erro ao upsert conversa:', convError);
       return;
     }
+
+    // ESPINHA: a conversa (DM/story) vira/atualiza um lead no CRM, com a origem certa.
+    await upsertLeadFromConversation(conversation).catch((e) =>
+      console.warn('Lead pipeline (webhook conversa) falhou:', e),
+    );
 
     // 4. Baixar mídia se houver
     let storedMediaUrl = parsed.media_url;

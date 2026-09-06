@@ -93,7 +93,44 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
 
         if (existing) {
-          continue; // Skip duplicata
+          continue; // Skip duplicata (já sincronizada pelo id canônico)
+        }
+
+        const direcao = msg.direction === 'incoming' ? 'in' : 'out';
+        const conteudo = msg.message || msg.content || '';
+
+        // RECONCILIAÇÃO anti-duplicata: quando ELA envia pelo painel, gravamos a mensagem
+        // localmente na hora (id_externo temporário 'out:'/'zmsg:'). Depois o Zernio devolve
+        // a MESMA mensagem com o id canônico → viravam 2 balões. Aqui, achamos o balão 'out'
+        // local temporário correspondente e ATUALIZAMOS pro id real em vez de inserir.
+        // Casa por CONTEÚDO (texto) OU, quando o conteúdo é vazio (só imagem), por
+        // PROXIMIDADE DE TEMPO (±5 min) — senão a imagem enviada duplicava.
+        if (direcao === 'out') {
+          const { data: candidatos } = await supabase
+            .from('zernio_messages')
+            .select('id, content, created_at')
+            .eq('conversation_id', conversation.id)
+            .eq('direcao', 'out')
+            .or('id_externo.like.out:%,id_externo.like.zmsg:%')
+            .order('created_at', { ascending: true });
+
+          let local: { id: any } | null = null;
+          if (candidatos && candidatos.length) {
+            const msgTime = new Date(msg.createdAt).getTime();
+            // 1) match exato por conteúdo (quando há texto)
+            if (conteudo) local = candidatos.find((c: any) => (c.content || '') === conteudo) || null;
+            // 2) senão, casa pelo horário próximo (cobre imagem sem texto)
+            if (!local) local = candidatos.find((c: any) => Math.abs(new Date(c.created_at).getTime() - msgTime) < 5 * 60 * 1000) || null;
+          }
+
+          if (local) {
+            await supabase
+              .from('zernio_messages')
+              .update({ id_externo: msg.id, autor: msg.senderName || 'Você' })
+              .eq('id', local.id);
+            syncedCount++;
+            continue; // reconciliado, NÃO insere de novo
+          }
         }
 
         // Baixar mídia se houver
@@ -125,8 +162,8 @@ export async function POST(req: NextRequest) {
             conversation_id: conversation.id,
             id_externo: msg.id,
             autor: msg.senderName || null,
-            direcao: msg.direction === 'incoming' ? 'in' : 'out',
-            content: msg.message || msg.content || '',
+            direcao,
+            content: conteudo,
             media_url: storedMediaUrl,
             media_tipo: mediaType,
             created_at: new Date(msg.createdAt),

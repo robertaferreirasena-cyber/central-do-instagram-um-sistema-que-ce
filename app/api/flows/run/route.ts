@@ -4,6 +4,7 @@ import {
   getOrCreateFlowRun,
   executeRun,
   resumeFlowFromButton,
+  dispatchFlowActions,
   Flow,
   FlowRun,
 } from '@/lib/flowEngine';
@@ -30,6 +31,17 @@ export async function POST(request: NextRequest) {
       // Executa o fluxo
       const result = await executeRun(run, flow);
 
+      // ENVIA de verdade: enfileira as ações (só enfileira; o drain é travado).
+      const enqueued = await dispatchFlowActions(result.actions, {
+        accountId: body.accountId || igUserId,
+        triggerType: (body.triggerType as 'comment' | 'story_reply' | 'dm') || 'dm',
+        commentId: body.commentId,
+        conversationId,
+        contactId: igUserId,
+        flowId,
+        runId: result.run.id,
+      });
+
       // Aplica segurança: seta cooldown do agente se flow iniciou
       if (flow.cooldown_minutes && flow.cooldown_minutes > 0) {
         await setAiCooldown(igUserId, conversationId, flow.cooldown_minutes);
@@ -39,6 +51,7 @@ export async function POST(request: NextRequest) {
         runId: result.run.id,
         status: result.run.status,
         actions: result.actions,
+        enqueued,
         nextStep: result.nextStep,
       });
     } else if (action === 'resume') {
@@ -48,10 +61,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Flow run not found' }, { status: 404 });
       }
 
+      // ENVIA de verdade as próximas ações (fila; drain travado).
+      const enqueued = await dispatchFlowActions(result.actions, {
+        accountId: body.accountId || igUserId,
+        triggerType: 'dm',
+        conversationId,
+        contactId: igUserId,
+        flowId: body.flowId || 0,
+        runId,
+      });
+
       return NextResponse.json({
         runId: result.run.id,
         status: result.run.status,
         actions: result.actions,
+        enqueued,
       });
     } else if (action === 'get_run') {
       // Obtém o status de um run

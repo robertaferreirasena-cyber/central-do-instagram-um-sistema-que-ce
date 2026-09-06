@@ -40,10 +40,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<ContentBrief>;
 
-    // Validar campos obrigatórios (account_id é resolvido no servidor)
-    if (!body.type || !body.caption || !body.scheduled_at) {
+    // Validar campos obrigatórios (account_id é resolvido no servidor).
+    // scheduled_at é OPCIONAL: a UI permite "agendar depois" (coluna nullable no banco).
+    if (!body.type || !body.caption) {
       return NextResponse.json(
-        { success: false, error: 'Campos obrigatórios faltando: type, caption, scheduled_at' } as ApiResponse<null>,
+        { success: false, error: 'Campos obrigatórios faltando: type, caption' } as ApiResponse<null>,
         { status: 400 }
       );
     }
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       theme: body.theme || '',
       caption: body.caption,
       hashtags: body.hashtags || [],
-      scheduled_at: body.scheduled_at,
+      scheduled_at: body.scheduled_at || null,
       status: ContentStatus.DRAFT,
       created_by: body.created_by || 'unknown',
       created_at: new Date(),

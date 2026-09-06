@@ -38,10 +38,11 @@ export async function GET(req: NextRequest) {
     const conversas_aguardando_humano = conversations?.filter((c: any) => c.estado === 'aguardando_humano').length || 0;
 
     // 2. Revisões pendentes (agente_sugestoes com status='pendente')
+    // NOTA: o insert de agente_sugestoes não grava account_id, então filtrar por
+    // account_id zerava a contagem. Contamos todas as pendentes (single-tenant).
     const { data: suggestions, error: sugError } = await supabase
       .from('agente_sugestoes')
       .select('id, status')
-      .eq('account_id', accountId)
       .eq('status', 'pendente');
 
     if (sugError) {

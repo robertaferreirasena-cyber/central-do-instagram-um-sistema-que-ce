@@ -38,6 +38,27 @@ export interface BrainSection {
   diferenciais?: {
     items?: Array<{ diferencial: string; descricao?: string }>;
   };
+  // Design System da marca (camada Marca): tokens visuais reusados por
+  // templates e render. Alimenta lib/studio/brandKit.ts.
+  design?: {
+    cores?: {
+      fundo?: string; // cor base dos slides
+      tinta?: string; // texto principal
+      acento?: string; // destaque/marca
+      apoio?: string; // secundária
+      gradiente?: [string, string]; // para fundos/gradient text
+    };
+    fontes?: {
+      titulo?: string; // family do título
+      corpo?: string; // family do corpo
+      mono?: string; // etiquetas/rótulos
+    };
+    logo_url?: string;
+    avatar_url?: string; // foto/rosto da marca (Twitter-style header)
+    handle?: string; // @perfil
+    tom_visual?: string; // 1 linha: "editorial, respiro, sem stock óbvio"
+    regras_foto?: string[]; // orientações p/ escolha de imagens
+  };
 }
 
 export interface Brain {
@@ -371,6 +392,7 @@ export async function initBrain(accountId: string): Promise<Brain | null> {
             politicas: {},
             conteudos_aprovados: {},
             diferenciais: {},
+            design: {},
           },
           score: 0,
           status: 'draft',

@@ -4,12 +4,9 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { TENANT_TEXT } from '@/lib/tenant';
 
-type ViewMode = 'mes' | 'semana';
-
 export default function CalendarioPage() {
   const [briefs, setBriefs] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('mes');
 
   useEffect(() => {
     loadBriefs();
@@ -28,12 +25,15 @@ export default function CalendarioPage() {
   };
 
   const getColorByType = (type: string) => {
+    // Aceita os dois vocabulários: enum ContentType (feed/carousel) e PT (post/carrossel).
     switch (type?.toLowerCase()) {
       case 'carrossel':
+      case 'carousel':
         return { bg: '#E6F5D6', text: '#2D7A1F', border: '#B8E6A0' };
       case 'reel':
         return { bg: '#F0E6F5', text: '#6B2D7A', border: '#D9B8E6' };
       case 'post':
+      case 'feed':
         return { bg: '#E6EDF5', text: '#2D4D7A', border: '#B8CDE6' };
       case 'story':
         return { bg: '#F5EDE6', text: '#7A5B2D', border: '#E6CDB8' };
@@ -243,6 +243,7 @@ export default function CalendarioPage() {
               ›
             </button>
             <button
+              onClick={() => { window.location.href = '/content/create'; }}
               style={{
                 backgroundColor: '#D6F24B',
                 color: '#0E2A2E',
@@ -264,32 +265,8 @@ export default function CalendarioPage() {
       />
 
       <main style={{ padding: '2rem', flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem', width: '100%' }}>
-        {/* ÁREA PRINCIPAL: Calendário */}
+        {/* ÁREA PRINCIPAL: Calendário (visão mensal) */}
         <div>
-          {/* Toggle Mês/Semana */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-            {(['mes', 'semana'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: viewMode === mode ? '#0E2A2E' : '#FFFFFF',
-                  color: viewMode === mode ? '#FAFAF8' : '#0E2A2E',
-                  border: '1px solid #E2E2DE',
-                  borderRadius: '0',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 200ms ease',
-                }}
-              >
-                {mode === 'mes' ? 'Mês' : 'Semana editorial'}
-              </button>
-            ))}
-          </div>
-
-          {/* Conteúdo do calendário */}
           {renderMonthCalendar()}
         </div>
 

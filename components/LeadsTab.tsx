@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { CURRENT_ACCOUNT_ID } from '@/lib/currentAccount';
+import LeadProfile, { type LeadFull, type LeadPerfil } from '@/components/leads/LeadProfile';
 
 interface Lead {
   id: string;
@@ -15,6 +17,13 @@ interface Lead {
   vendedor_nome?: string;
   resultado: string;
   criado_em: string;
+  // Perfil completo (enriquecido pelas interações do Direct)
+  avatar_url?: string | null;
+  primeiro_contato?: string | null;
+  ultimo_contato?: string | null;
+  total_mensagens?: number;
+  zernio_conversa_id?: number | null;
+  perfil?: LeadPerfil | null;
 }
 
 interface Seller {
@@ -43,7 +52,6 @@ export function LeadsTab() {
   const [filterOrigem, setFilterOrigem] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Lead>>({});
 
   useEffect(() => {
     fetchLeads();
@@ -54,6 +62,7 @@ export function LeadsTab() {
     setLoading(true);
     try {
       const url = new URL('/api/instagram/leads', window.location.origin);
+      url.searchParams.append('accountId', CURRENT_ACCOUNT_ID);
       if (filterOrigem) url.searchParams.append('origem', filterOrigem);
       if (filterStatus) url.searchParams.append('status', filterStatus);
 
@@ -72,34 +81,15 @@ export function LeadsTab() {
 
   async function fetchSellers() {
     try {
-      const res = await fetch('/api/instagram/sellers');
+      const url = new URL('/api/instagram/sellers', window.location.origin);
+      url.searchParams.append('accountId', CURRENT_ACCOUNT_ID);
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setSellers(data.sellers || []);
       }
     } catch (err) {
       console.error('Erro ao carregar vendedores:', err);
-    }
-  }
-
-  async function updateLead() {
-    if (!selectedLead) return;
-    try {
-      const res = await fetch(`/api/instagram/leads/${selectedLead.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Lead atualizado');
-        setSelectedLead(null);
-        fetchLeads();
-      } else {
-        alert('Erro: ' + data.error);
-      }
-    } catch (err) {
-      alert('Erro ao atualizar: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   }
 
@@ -287,10 +277,7 @@ export function LeadsTab() {
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <button
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setEditForm(lead);
-                      }}
+                      onClick={() => setSelectedLead(lead)}
                       style={{
                         padding: '0.25rem 0.75rem',
                         background: '#29b6ff',
@@ -301,7 +288,7 @@ export function LeadsTab() {
                         fontSize: '0.75rem',
                       }}
                     >
-                      Editar
+                      Ver perfil
                     </button>
                   </td>
                 </tr>
@@ -315,137 +302,14 @@ export function LeadsTab() {
         </div>
       )}
 
-      {/* Modal de Edição */}
+      {/* Perfil completo do lead (drawer) */}
       {selectedLead && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setSelectedLead(null)}
-        >
-          <div
-            style={{
-              background: '#fff',
-              padding: '2rem',
-              borderRadius: '8px',
-              maxWidth: '500px',
-              width: '90%',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Editar Lead</h3>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Interesse</label>
-              <textarea
-                value={editForm.interesse || ''}
-                onChange={(e) => setEditForm({ ...editForm, interesse: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  minHeight: '80px',
-                  fontSize: '0.875rem',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Score</label>
-              <input
-                type="number"
-                value={editForm.score || 0}
-                onChange={(e) => setEditForm({ ...editForm, score: parseInt(e.target.value) || 0 })}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Status</label>
-              <select
-                value={editForm.status || 'novo'}
-                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Resultado</label>
-              <input
-                type="text"
-                value={editForm.resultado || ''}
-                onChange={(e) => setEditForm({ ...editForm, resultado: e.target.value })}
-                placeholder="pedido, adiado, perdido, etc"
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={updateLead}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: '#29b6ff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Salvar
-              </button>
-              <button
-                onClick={() => setSelectedLead(null)}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: '#f0f0f0',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <LeadProfile
+          lead={selectedLead as unknown as LeadFull}
+          sellers={sellers}
+          onClose={() => setSelectedLead(null)}
+          onRefetch={fetchLeads}
+        />
       )}
     </div>
   );

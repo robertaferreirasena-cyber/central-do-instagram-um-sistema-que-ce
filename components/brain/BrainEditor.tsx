@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrainSection } from '@/lib/brain';
 
 interface BrainEditorProps {
@@ -18,6 +18,13 @@ export default function BrainEditor({
 }: BrainEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [formData, setFormData] = useState(data || {});
+
+  // Ao trocar de seção (ou os dados mudarem), recarrega o formulário — senão o editor
+  // fica preso nos dados da seção anterior e salva no lugar errado.
+  useEffect(() => {
+    setFormData(data || {});
+    setEditingField(null);
+  }, [data, section]);
 
   const handleSave = () => {
     // Se formData é string, salva como string; se é objeto, salva como objeto

@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const accountId = searchParams.get('accountId');
     const origem = searchParams.get('origem');
     const status = searchParams.get('status');
+    const instagram = searchParams.get('instagram'); // busca o lead de um @ (usado pela inbox)
 
     if (!accountId) {
       return NextResponse.json({ success: false, error: 'accountId obrigatório' }, { status: 400 });
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 
     if (origem) query = query.eq('origem', origem);
     if (status) query = query.eq('status', status);
+    if (instagram) query = query.eq('instagram', instagram.replace(/^@/, ''));
 
     const { data: leadsData, error } = await query.order('criado_em', { ascending: false });
 

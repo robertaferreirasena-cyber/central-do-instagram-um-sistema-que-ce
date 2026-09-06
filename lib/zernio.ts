@@ -193,12 +193,22 @@ export class ZernioClient {
   }
 
   // POST /inbox/conversations/{id}/messages - envia mensagem DM
+  // opts: recursos oficiais do Zernio — messageTag/messagingType (janela de agente humano,
+  // 7 dias, igual ao app do Instagram quando um HUMANO responde), attachmentUrl/Type (mídia
+  // de saída), replyTo (responder citando uma mensagem).
   async sendMessage(
     conversationId: string,
     accountId: string,
     message: string,
     buttons?: Array<{ type: 'web_url'; title: string; url: string }>,
-    quickReplies?: string[]
+    quickReplies?: string[],
+    opts?: {
+      messagingType?: 'RESPONSE' | 'UPDATE' | 'MESSAGE_TAG';
+      messageTag?: 'HUMAN_AGENT' | 'CONFIRMED_EVENT_UPDATE' | 'POST_PURCHASE_UPDATE' | 'ACCOUNT_UPDATE';
+      attachmentUrl?: string;
+      attachmentType?: 'image' | 'video' | 'audio' | 'file';
+      replyTo?: string;
+    }
   ): Promise<{ data: any | null; error: string | null }> {
     if (!this.apiKey) {
       return { data: null, error: 'ZERNIO_API_KEY não configurada' };
@@ -211,6 +221,11 @@ export class ZernioClient {
       };
       if (buttons) body.buttons = buttons;
       if (quickReplies) body.quickReplies = quickReplies;
+      if (opts?.messagingType) body.messagingType = opts.messagingType;
+      if (opts?.messageTag) body.messageTag = opts.messageTag;
+      if (opts?.attachmentUrl) body.attachmentUrl = opts.attachmentUrl;
+      if (opts?.attachmentType) body.attachmentType = opts.attachmentType;
+      if (opts?.replyTo) body.replyTo = opts.replyTo;
 
       const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}/messages`, {
         method: 'POST',
@@ -228,6 +243,48 @@ export class ZernioClient {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return { data: null, error: message };
+    }
+  }
+
+  // POST /inbox/conversations/{id}/typing - mostra "digitando…" pro cliente
+  async sendTyping(conversationId: string, accountId: string): Promise<{ data: any | null; error: string | null }> {
+    if (!this.apiKey) return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}/typing`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ accountId }),
+      });
+      if (!response.ok) {
+        const error = await response.text();
+        return { data: null, error: `Zernio error: ${response.status} ${error}` };
+      }
+      return { data: await response.json().catch(() => ({})), error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  }
+
+  // PUT /inbox/conversations/{id} - arquiva ou reativa a conversa (status active|archived)
+  async updateConversation(
+    conversationId: string,
+    accountId: string,
+    status: 'active' | 'archived'
+  ): Promise<{ data: any | null; error: string | null }> {
+    if (!this.apiKey) return { data: null, error: 'ZERNIO_API_KEY não configurada' };
+    try {
+      const response = await fetch(`${this.baseUrl}/inbox/conversations/${conversationId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ accountId, status }),
+      });
+      if (!response.ok) {
+        const error = await response.text();
+        return { data: null, error: `Zernio error: ${response.status} ${error}` };
+      }
+      return { data: await response.json().catch(() => ({})), error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
     }
   }
 

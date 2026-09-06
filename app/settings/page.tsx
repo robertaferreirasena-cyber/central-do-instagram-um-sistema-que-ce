@@ -1,11 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+type ApiStatus = { publora: boolean; zernio: boolean; claude: boolean; crm: boolean; telegram: boolean };
+
+function StatusBadge({ ok }: { ok: boolean | undefined }) {
+  if (ok === undefined) return <span className="text-slate-400">⏳ Verificando...</span>;
+  return ok
+    ? <span className="text-green-400">✓ Configurado</span>
+    : <span className="text-red-400">❌ Não configurado</span>;
+}
 
 export default function SettingsPage() {
   const [agenteAtivo, setAgenteAtivo] = useState(false);
   const [aba, setAba] = useState<'apis' | 'agentes'>('apis');
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<ApiStatus | null>(null);
+
+  // Carrega o estado real do agente ao abrir (senão mostra sempre "DESLIGADO").
+  useEffect(() => {
+    fetch('/api/agente/toggle')
+      .then((r) => r.json())
+      .then((d) => setAgenteAtivo(!!d.agenteAtivo))
+      .catch(() => {});
+  }, []);
+
+  // Verifica no servidor quais integrações têm env configurada (só boolean, sem expor chaves).
+  useEffect(() => {
+    fetch('/api/settings/status')
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setApiStatus({ publora: d.publora, zernio: d.zernio, claude: d.claude, crm: d.crm, telegram: d.telegram }); })
+      .catch(() => {});
+  }, []);
 
   const handleToggleAgente = async () => {
     setLoading(true);
@@ -142,7 +168,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-slate-500 text-xs mt-3">
-            Status: <span className="text-red-400">❌ Não configurado</span>
+            Status: <StatusBadge ok={apiStatus?.publora} />
           </p>
         </div>
 
@@ -160,7 +186,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-slate-500 text-xs mt-3">
-            Status: <span className="text-red-400">❌ Não configurado</span>
+            Status: <StatusBadge ok={apiStatus?.zernio} />
           </p>
           <p className="text-slate-400 text-xs mt-3">
             Webhook URL para Zernio: <code className="bg-black/30 px-2 py-1 rounded">https://seu-dominio.com/api/webhook/zernio</code>
@@ -176,7 +202,7 @@ export default function SettingsPage() {
             CLAUDE_API_KEY=sk-ant-...
           </div>
           <p className="text-slate-500 text-xs mt-3">
-            Status: <span className="text-red-400">❌ Não configurado</span>
+            Status: <StatusBadge ok={apiStatus?.claude} />
           </p>
         </div>
 
@@ -194,7 +220,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-slate-500 text-xs mt-3">
-            Status: <span className="text-red-400">❌ Não configurado</span>
+            Status: <StatusBadge ok={apiStatus?.crm} />
           </p>
         </div>
 
@@ -212,7 +238,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-slate-500 text-xs mt-3">
-            Status: <span className="text-red-400">❌ Não configurado</span>
+            Status: <StatusBadge ok={apiStatus?.telegram} />
           </p>
         </div>
 

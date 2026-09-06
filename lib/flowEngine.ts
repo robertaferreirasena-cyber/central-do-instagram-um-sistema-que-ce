@@ -1,6 +1,7 @@
 import { supabase, dbQuery } from './db';
 import { canSendFollowReminder } from './variables';
 import { isValidEmail, extractEmail } from './utils';
+import { enqueue } from './sendQueue';
 
 export interface FlowStep {
   id: string;
@@ -13,6 +14,8 @@ export interface FlowStep {
   no_step?: string;
   yes_target?: string;
   no_target?: string;
+  condition_field?: string;
+  condition_equals?: string;
   delay_seconds?: number;
   media_url?: string;
   media_type?: string;
@@ -202,16 +205,25 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
         isRunning = false;
         break;
 
-      case 'condition':
+      case 'condition': {
         const conditionMet = checkCondition(context, step);
         if (hasEdges) {
-          nextStepIndex = -1;
-        } else {
-          const targetStepId = conditionMet ? step.yes_target : step.no_target;
-          const targetIdx = flow.steps.findIndex(s => s.id === targetStepId);
-          nextStepIndex = targetIdx !== -1 ? targetIdx : currentStepIndex + 1;
+          // Condições ramificam pelos handles 'yes'/'no' (não 'next') — senão o fluxo
+          // encerrava na condição e os ramos SIM/NÃO nunca rodavam.
+          const handle = conditionMet ? 'yes' : 'no';
+          const nextStepId = proximoNo(flow.edges, step.id, handle) || proximoNo(flow.edges, step.id, 'next');
+          currentStepIndex = nextStepId ? findStepIndexById(flow.steps, nextStepId) : flow.steps.length;
+          if (currentStepIndex === -1) {
+            newRun.status = 'completed';
+            isRunning = false;
+          }
+          continue; // já resolveu o próximo passo; pula o resolvedor genérico de 'next'
         }
+        const targetStepId = conditionMet ? step.yes_target : step.no_target;
+        const targetIdx = flow.steps.findIndex(s => s.id === targetStepId);
+        nextStepIndex = targetIdx !== -1 ? targetIdx : currentStepIndex + 1;
         break;
+      }
 
       case 'wait':
         actions.push({
@@ -250,18 +262,20 @@ export async function executeRun(run: FlowRun, flow: Flow): Promise<{
         if (followsAccount === null || followsAccount === undefined) {
           console.log('ℹ️ Follow status null, liberando (degradação graciosa):', newRun.id);
 
-          await supabase
-            .from('crm_eventos')
-            .insert({
+          // O builder do Supabase não é uma Promise com .catch — usar try/catch.
+          try {
+            await supabase.from('crm_eventos').insert({
               tipo: 'flow_follow_gate_degraded',
               payload: {
                 run_id: newRun.id,
                 reason: 'Meta did not return follow status',
                 fallback: 'allowed',
               },
-              created_at: new Date(),
-            })
-            .catch((err: any) => console.warn('⚠️ Erro ao registrar evento de degradação:', err));
+              criado_em: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.warn('⚠️ Erro ao registrar evento de degradação:', err);
+          }
 
           nextStepIndex = hasEdges ? -1 : currentStepIndex + 1;
           break;
@@ -408,11 +422,19 @@ export async function resumeFlowFromButton(
       }
       if (email) {
         run.context[currentStep.field_name] = email;
+        // CRM: grava o e-mail coletado no lead (+ auditoria). Não bloqueia o fluxo.
+        await persistCollectedLeadData(run, { [currentStep.field_name]: email }).catch((e) =>
+          console.warn('⚠️ persistCollectedLeadData (email) falhou:', e)
+        );
       }
       // Segue por 'next' handle
       targetStepId = proximoNo(flow.edges, currentStep.id, 'next');
     } else if (currentStep.type === 'collect_data' && currentStep.field_name) {
       run.context[currentStep.field_name] = buttonValue;
+      // CRM: grava o dado coletado (nome/telefone/etc.) no lead (+ auditoria).
+      await persistCollectedLeadData(run, { [currentStep.field_name]: buttonValue }).catch((e) =>
+        console.warn('⚠️ persistCollectedLeadData falhou:', e)
+      );
       targetStepId = proximoNo(flow.edges, currentStep.id, 'next');
     } else {
       // Fallback para compatibilidade: simplesmente avança de índice
@@ -453,11 +475,105 @@ function interpolate(text: string, context: Record<string, any>): string {
 }
 
 function checkCondition(context: Record<string, any>, step: FlowStep): boolean {
-  // Verifica se última resposta atende a condição
-  if (step.id && context.last_button_clicked) {
-    return !!context.last_button_clicked;
+  // Compara o valor esperado (condition_equals) com o que o cliente clicou/respondeu.
+  // Ex.: botão "Sim!" tem postback 'yes' e a condição espera condition_equals='yes'.
+  const clicado = context.last_button_clicked;
+  if (step.condition_equals !== undefined && step.condition_equals !== '') {
+    return String(clicado) === String(step.condition_equals);
   }
-  return false;
+  // Sem valor esperado: qualquer clique satisfaz (comportamento antigo, como fallback).
+  return !!clicado;
+}
+
+// ============================================================================
+// CRM — grava os dados coletados (collect_data) no LEAD correspondente.
+// O collect_data só guardava a resposta em flow_runs.context[field_name]; sem este
+// elo o dado morria no run e NUNCA chegava ao CRM. Aqui resolvemos o lead pelo
+// conversation_id do run (→ zernio_conversations.zernio_conversa → id numérico →
+// leads.zernio_conversa_id) ou pelo @ do participante, e gravamos usando SÓ colunas
+// que existem: nome→leads.nome, telefone→leads.telefone, e todo o resto (email etc.)
+// dentro de leads.perfil (jsonb). SEMPRE registra um crm_eventos de auditoria, mesmo
+// quando o lead ainda não existe — assim o dado coletado nunca se perde.
+export async function persistCollectedLeadData(
+  run: FlowRun,
+  collected: Record<string, any>,
+): Promise<{ leadId: number | null; persisted: boolean }> {
+  if (!supabase) return { leadId: null, persisted: false };
+
+  // Só campos "de verdade" (ignora chaves internas _journey/_follows_account/etc.).
+  const campos: Record<string, string> = {};
+  for (const [k, v] of Object.entries(collected || {})) {
+    if (!k || k.startsWith('_')) continue;
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (s === '') continue;
+    campos[k] = s;
+  }
+  if (Object.keys(campos).length === 0) return { leadId: null, persisted: false };
+
+  // 1. Resolve a conversa interna (numérica) + @ do participante pelo id externo do run.
+  let conversaId: number | null = null;
+  let username: string | null = null;
+  const { data: conv } = await dbQuery(() =>
+    supabase
+      .from('zernio_conversations')
+      .select('id, participant_username')
+      .eq('zernio_conversa', run.conversation_id)
+      .maybeSingle()
+  );
+  if (conv) {
+    conversaId = (conv as any).id ?? null;
+    username = (conv as any).participant_username ?? null;
+  }
+
+  // 2. Localiza o lead: primeiro pela conversa vinculada, senão pelo @ (instagram).
+  let leadId: number | null = null;
+  let perfilAtual: Record<string, unknown> = {};
+  let leadRow: any = null;
+  if (conversaId != null) {
+    const { data } = await dbQuery(() =>
+      supabase.from('leads').select('id, nome, telefone, perfil').eq('zernio_conversa_id', conversaId).maybeSingle()
+    );
+    leadRow = data;
+  }
+  if (!leadRow && username) {
+    const { data } = await dbQuery(() =>
+      supabase.from('leads').select('id, nome, telefone, perfil').eq('instagram', username).maybeSingle()
+    );
+    leadRow = data;
+  }
+  if (leadRow) {
+    leadId = (leadRow as any).id ?? null;
+    const p = (leadRow as any).perfil;
+    perfilAtual = p && typeof p === 'object' ? p : {};
+  }
+
+  // 3. Atualiza o lead (colunas existentes): nome/telefone diretos, resto no perfil jsonb.
+  if (leadId != null) {
+    const alvo = leadId;
+    const patch: Record<string, unknown> = { atualizado_em: new Date().toISOString() };
+    if (campos.nome) patch.nome = campos.nome.slice(0, 200);
+    if (campos.telefone) patch.telefone = campos.telefone.slice(0, 40);
+    patch.perfil = { ...perfilAtual, ...campos, dados_coletados_em: new Date().toISOString() };
+    await dbQuery(() =>
+      supabase.from('leads').update(patch).eq('id', alvo).select('id')
+    );
+  }
+
+  // 4. Auditoria: o dado coletado FICA REGISTRADO mesmo sem lead resolvido.
+  await dbQuery(() =>
+    supabase.from('crm_eventos').insert({
+      tipo: 'lead_dados_coletados',
+      canal: 'instagram',
+      origem: 'automacao',
+      lead_id: leadId,
+      conversa_id: conversaId,
+      ator: 'flow',
+      payload: { flow_id: run.flow_id, run_id: run.id, ig_user_id: run.ig_user_id, campos },
+    }).select('id')
+  );
+
+  return { leadId, persisted: leadId != null };
 }
 
 export async function listFlows(enabled?: boolean): Promise<Flow[]> {
@@ -514,8 +630,16 @@ export async function matchFlows(
         .map((k) => normalizeText(k))
         .filter((k) => k);
 
+      // Normaliza o vocabulário: a UI/templates/DirectPro gravam em INGLÊS
+      // ('contains'/'exact'/'begins'), a engine falava só PORTUGUÊS → nenhum funil
+      // com palavra-chave casava. Aceita os dois.
+      const raw = (flow.match_mode || 'contem').toLowerCase();
+      const matchMode =
+        raw === 'exact' || raw === 'exata' ? 'exata' :
+        raw === 'begins' || raw === 'starts' || raw === 'comeca' || raw === 'começa' ? 'comeca' :
+        'contem'; // 'contains'/'contem'/qualquer outro = contém
+
       for (const kw of keywords) {
-        const matchMode = flow.match_mode || 'contem';
         if (matchMode === 'exata' && normalizedKeyword === kw) {
           return true;
         }
@@ -561,4 +685,136 @@ export async function deleteFlow(flowId: number): Promise<boolean> {
     supabase.from('flows').delete().eq('id', flowId)
   );
   return !error;
+}
+
+// ============================================================================
+// DISPATCH — o elo que faltava: transforma as ACTIONS do executeRun em envios
+// REAIS, enfileirando na send_queue (que drena via Zernio, com gate). Alinhado ao
+// DirectPro: comentário → private_reply (fura a janela 24h, 1×) + comment_reply
+// (público); DM/story e passos seguintes → dm. 'wait' vira not_before do próximo.
+// NÃO envia nada por si — só enfileira; o envio real depende do drain (travado).
+// ============================================================================
+
+interface FlowActionLike {
+  type: string;
+  text?: string;
+  caption?: string;
+  media_url?: string;
+  media_type?: string;
+  is_private?: boolean;
+  delay_seconds?: number;
+  quick_replies?: Array<{ label: string; postback?: string }>;
+}
+
+export interface DispatchContext {
+  accountId: string; // conta que envia (zernio account_id)
+  triggerType: 'comment' | 'story_reply' | 'dm';
+  commentId?: string;
+  conversationId?: string;
+  contactId?: string;
+  flowId: number;
+  runId: number;
+}
+
+// Fecha o loop ManyChat: quando chega uma DM de alguém que tem um fluxo EM ESPERA,
+// tenta casar o texto com um botão do menu (ou responder um collect_data) e RETOMA
+// o fluxo — a próxima mensagem/DM (ex.: o link) é enfileirada. Retorna resumed=false
+// se não há fluxo em espera ou o texto não casa (aí o webhook segue o fluxo normal).
+export async function tryResumeFlow(ctx: {
+  accountId: string;
+  contactId: string;
+  conversationId?: string;
+  messageText: string;
+}): Promise<{ resumed: boolean; enqueued?: number }> {
+  if (!supabase || !ctx.contactId) return { resumed: false };
+  const { data: run } = await dbQuery(() =>
+    supabase
+      .from('flow_runs')
+      .select('*')
+      .eq('ig_user_id', ctx.contactId)
+      .eq('status', 'waiting')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single()
+  );
+  if (!run) return { resumed: false };
+  const r = run as FlowRun;
+  const flow = await getFlow(r.flow_id);
+  if (!flow) return { resumed: false };
+  const step = flow.steps[r.current_step];
+  if (!step) return { resumed: false };
+
+  const texto = (ctx.messageText || '').trim();
+  const txtLow = texto.toLowerCase();
+  let buttonIndex = 0;
+  let buttonValue: string;
+
+  if (step.type === 'quick_replies' && step.buttons?.length) {
+    const idx = step.buttons.findIndex((b) => {
+      const lbl = (b.label || '').trim().toLowerCase();
+      return !!lbl && (txtLow === lbl || txtLow.includes(lbl) || lbl.includes(txtLow));
+    });
+    if (idx < 0) return { resumed: false }; // não casou nenhum botão → não é resposta ao menu
+    buttonIndex = idx;
+    buttonValue = `FLOW:${flow.id}:${step.id}:${idx}`;
+  } else {
+    buttonValue = texto; // collect_data / resposta livre
+  }
+
+  const result = await resumeFlowFromButton(r.id, buttonIndex, buttonValue);
+  if (!result) return { resumed: false };
+  const enqueued = await dispatchFlowActions(result.actions, {
+    accountId: ctx.accountId,
+    triggerType: 'dm',
+    conversationId: ctx.conversationId,
+    contactId: ctx.contactId,
+    flowId: flow.id,
+    runId: r.id,
+  });
+  return { resumed: true, enqueued };
+}
+
+export async function dispatchFlowActions(actions: FlowActionLike[], ctx: DispatchContext): Promise<number> {
+  let enqueued = 0;
+  let delayMs = 0;
+  let usouPrivadaDoComentario = false;
+
+  for (let i = 0; i < actions.length; i++) {
+    const a = actions[i];
+    if (a.type === 'wait') {
+      delayMs += (a.delay_seconds || 0) * 1000;
+      continue;
+    }
+    if (a.type !== 'send_message' && a.type !== 'send_media') continue; // notify_admin etc. são internos
+
+    // Zernio não tem botão rico: anexa os quick_replies como linhas no texto.
+    const base = a.text || a.caption || '';
+    const botoes = (a.quick_replies || []).map((q) => `▸ ${q.label}`).join('\n');
+    const message = botoes ? `${base}\n\n${botoes}`.trim() : base;
+
+    let kind: 'dm' | 'comment_reply' | 'private_reply';
+    if (ctx.triggerType === 'comment' && a.is_private && !usouPrivadaDoComentario) {
+      kind = 'private_reply'; // fura a janela de 24h, 1× por comentário
+      usouPrivadaDoComentario = true;
+    } else if (!a.is_private && ctx.commentId) {
+      kind = 'comment_reply'; // resposta pública no comentário
+    } else {
+      kind = 'dm'; // dentro da janela de 24h
+    }
+
+    const ok = await enqueue({
+      account_id: ctx.accountId,
+      kind,
+      contact_id: ctx.contactId,
+      conversation_id: ctx.conversationId,
+      comment_id: ctx.commentId,
+      message,
+      media_url: a.type === 'send_media' ? a.media_url : undefined,
+      media_type: a.type === 'send_media' ? a.media_type : undefined,
+      dedupe_key: `flow:${ctx.flowId}:${ctx.runId}:${i}:${ctx.commentId || ctx.conversationId || ctx.contactId || 'x'}`,
+      not_before: delayMs > 0 ? new Date(Date.now() + delayMs) : undefined,
+    });
+    if (ok) enqueued++;
+  }
+  return enqueued;
 }

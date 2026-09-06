@@ -23,10 +23,19 @@ export async function POST(request: NextRequest) {
 
     const newValue = current?.value === 'true' ? 'false' : 'true';
 
-    await supabase
+    // Update (a linha 'agente_ativo' já existe em crm_config.key/value); se por acaso não
+    // casar nenhuma linha, INSERE. Não usa upsert pra não depender de índice único em `key`.
+    // Regra de segurança: o agente é OFF por padrão e a persistência precisa ser confiável.
+    const { data: upd, error } = await supabase
       .from('crm_config')
       .update({ value: newValue })
-      .eq('key', 'agente_ativo');
+      .eq('key', 'agente_ativo')
+      .select('value');
+
+    if (error) throw error;
+    if (!upd || upd.length === 0) {
+      await supabase.from('crm_config').insert({ key: 'agente_ativo', value: newValue });
+    }
 
     return NextResponse.json(
       {

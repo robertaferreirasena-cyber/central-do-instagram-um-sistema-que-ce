@@ -157,12 +157,6 @@ export default function BrainPage() {
             >
               {saving ? 'Carregando...' : 'Seedar IA Club'}
             </button>
-            <button className="px-4 py-2 border border-[#3ddc84] text-[#3ddc84] font-semibold rounded hover:bg-[#3ddc84]/10">
-              Importar material
-            </button>
-            <button className="px-4 py-2 border border-[#3ddc84] text-[#3ddc84] font-semibold rounded hover:bg-[#3ddc84]/10">
-              Nova informação
-            </button>
           </div>
         </div>
 

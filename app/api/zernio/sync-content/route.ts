@@ -33,8 +33,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Chamar GET /analytics do Zernio (todas as plataformas — Central de Marketing multi-canal)
-    const { data: analyticsData, error: analyticsError } = await zernio.getAnalytics('', 30);
+    // 2. Chamar GET /analytics do Zernio — SÓ Instagram (a tabela é instagram_media;
+    //    sem o filtro, o Zernio devolve todas as plataformas e vaza YouTube/TikTok aqui).
+    const { data: analyticsData, error: analyticsError } = await zernio.getAnalytics('instagram', 30);
 
     if (analyticsError || !analyticsData) {
       console.error('Erro ao buscar analytics do Zernio:', analyticsError);
@@ -63,6 +64,8 @@ export async function POST(req: NextRequest) {
 
     for (const post of posts) {
       try {
+        // Trava extra: só Instagram entra em instagram_media (nunca YouTube/TikTok).
+        if (post.platform && post.platform !== 'instagram') continue;
         // Mapear campos: Zernio -> instagram_media
         const { error: upsertError } = await supabase
           .from('instagram_media')
@@ -151,6 +154,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 6a. Engagement REAL = soma de (likes + comentários + salvos) de todos os posts.
+    const engagement = posts.reduce(
+      (acc, p) => acc + (p.analytics?.likes || 0) + (p.analytics?.comments || 0) + (p.analytics?.saves || 0),
+      0
+    );
+
+    // 6b. Followers: buscar de zernio_accounts.followers_count (se a coluna existir).
+    let followers = 0;
+    try {
+      const { data: followersRow } = await supabase
+        .from('zernio_accounts')
+        .select('followers_count')
+        .eq('platform', 'instagram')
+        .single();
+      followers = (followersRow as any)?.followers_count || 0;
+    } catch {
+      // coluna/linha ausente — mantém followers = 0
+    }
+
     // 6. Guardar resumo em crm_config.zernio_analytics (cache para UI)
     const summaryData = {
       totalPosts: analyticsData.overview?.totalPosts || 0,
@@ -158,8 +180,8 @@ export async function POST(req: NextRequest) {
       totalLikes: analyticsData.overview?.totalLikes || 0,
       totalComments: analyticsData.overview?.totalComments || 0,
       totalSaves: analyticsData.overview?.totalSaves || 0,
-      followers: 0, // TODO: puxar de outro endpoint se existir
-      engagement: 0, // Calculado pela UI
+      followers, // de zernio_accounts.followers_count (0 se indisponível)
+      engagement, // soma real de likes+comentários+salvos dos posts
       posts: posts
         .slice(0, 10)
         .map((p) => ({

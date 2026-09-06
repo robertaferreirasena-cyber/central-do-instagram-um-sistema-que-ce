@@ -84,8 +84,10 @@ export default function FilaAprovacao() {
     }
   }
 
-  async function rejeitar(sugestaoId: string) {
-    if (!rejectReason.trim()) return;
+  async function rejeitar(sugestaoId: string, motivo: string) {
+    // Recebe o motivo por ARGUMENTO (antes lia do state logo após setState no mesmo tick →
+    // sempre lia '' e o guard abaixo abortava, então Rejeitar nunca funcionava).
+    if (!motivo.trim()) return;
 
     try {
       const res = await fetch('/api/agente/sugestoes', {
@@ -94,7 +96,7 @@ export default function FilaAprovacao() {
         body: JSON.stringify({
           sugestaoId,
           acao: 'rejeitar',
-          motivoRejeicao: rejectReason,
+          motivoRejeicao: motivo,
         }),
       });
 
@@ -238,8 +240,7 @@ export default function FilaAprovacao() {
                         onClick={() => {
                           const reason = prompt('Motivo da rejeição:');
                           if (reason) {
-                            setRejectReason(reason);
-                            rejeitar(sug.id);
+                            rejeitar(sug.id, reason);
                           }
                         }}
                         className="inline-flex items-center gap-1 px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
