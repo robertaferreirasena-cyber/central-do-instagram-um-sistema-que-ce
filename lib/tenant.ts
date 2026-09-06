@@ -1,7 +1,7 @@
 import { supabase } from './db';
 
 // Constantes de tenant — fonte única de verdade
-export const TENANT_TEXT = 'default-account'; // usado por zernio_conversations, flows, content_templates
+export const TENANT_TEXT = 'default-account'; // usado por zernio_conversations, flows, studio_templates, studio_projects
 export const BRAIN_ACCOUNT = 'iaclub-default'; // usado por brain
 
 // As tabelas de CONTEUDO (content_briefs, content_calendar_items, content_campaigns,
