@@ -1,7 +1,27 @@
-﻿import { chromium } from "playwright";
-import JSZip from "jszip";
+﻿import JSZip from "jszip";
 import { generateHtmlForSlides } from "@/lib/studio/slideToHtml";
 import type { Slide } from "@/lib/studio/types";
+
+// Runtime Node (chromium não roda no Edge) + tempo maior pro render headless
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+// Local: usa o `playwright` completo (com chromium próprio).
+// Serverless (Vercel/Lambda): usa `playwright-core` + `@sparticuz/chromium` (binário empacotado).
+async function launchBrowser() {
+  const serverless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_REGION);
+  if (serverless) {
+    const sparticuz = (await import("@sparticuz/chromium")).default;
+    const { chromium } = await import("playwright-core");
+    return chromium.launch({
+      args: sparticuz.args,
+      executablePath: await sparticuz.executablePath(),
+      headless: true,
+    });
+  }
+  const { chromium } = await import("playwright");
+  return chromium.launch();
+}
 
 export async function POST(req: Request) {
   let browser;
@@ -15,7 +35,7 @@ export async function POST(req: Request) {
 
     const html = generateHtmlForSlides(slides);
 
-    browser = await chromium.launch();
+    browser = await launchBrowser();
     const page = await browser.newPage({
       viewport: { width: 1080, height: 1440 },
       deviceScaleFactor: 2,
