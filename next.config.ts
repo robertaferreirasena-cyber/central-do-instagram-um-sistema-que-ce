@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Não empacotar o Chromium/Playwright no bundle serverless (rodam como deps externas na Vercel)
+  serverExternalPackages: ["@sparticuz/chromium", "playwright-core", "playwright"],
 };
 
 export default nextConfig;
