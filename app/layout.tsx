@@ -29,13 +29,33 @@ export default function RootLayout({
       </head>
       <body className={instrumentSans.className} style={{ backgroundColor: '#0E2A2E', color: '#0E2A2E', margin: 0, padding: 0 }}>
         <style>{`
+          html, body {
+            width: 100%;
+            overflow-x: hidden;
+          }
           [data-role="content"] {
             margin-left: 280px;
+            padding: clamp(1rem, 4vw, 2rem);
           }
-          @media (max-width: 1023px) {
+          @media (max-width: 1024px) {
             [data-role="content"] {
               margin-left: 0;
-              padding-top: 3.5rem;
+              padding-top: clamp(4rem, 10vw, 5.5rem);
+              padding-left: clamp(1rem, 3vw, 1.5rem);
+              padding-right: clamp(1rem, 3vw, 1.5rem);
+              padding-bottom: clamp(1rem, 4vw, 2rem);
+            }
+          }
+          @media (max-width: 768px) {
+            [data-role="content"] {
+              padding-top: clamp(3.5rem, 10vw, 4.5rem);
+            }
+          }
+          @media (max-width: 640px) {
+            [data-role="content"] {
+              padding-left: clamp(0.75rem, 2vw, 1rem);
+              padding-right: clamp(0.75rem, 2vw, 1rem);
+              padding-top: clamp(3rem, 8vw, 3.5rem);
             }
           }
         `}</style>

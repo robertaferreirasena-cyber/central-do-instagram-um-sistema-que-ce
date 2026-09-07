@@ -12,25 +12,50 @@ export default function ProjetosGrid(props: {
   const { projects, newName, setNewName, onCreate, onOpen, onDelete } = props;
   return (
     <>
+      <style>{`
+        .projetos-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 16px;
+        }
+        @media (max-width: 768px) {
+          .projetos-container {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+          }
+        }
+        @media (max-width: 640px) {
+          .projetos-container {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+          }
+        }
+        @media (max-width: 480px) {
+          .projetos-container {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+        }
+      `}</style>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ marginTop: 0, marginBottom: 12, color: '#D6F24B' }}>Seus Projetos</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input
             type="text"
             placeholder="Nome do novo projeto"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyPress={(e) => { if (e.key === 'Enter') onCreate(); }}
-            style={{ flex: 1, maxWidth: 300, padding: '8px 12px', backgroundColor: '#0a1315', color: '#FAFAF8', border: '1px solid #46655C', borderRadius: 4, fontSize: 13 }}
+            style={{ flex: 1, minWidth: '180px', maxWidth: '100%', padding: '8px 12px', backgroundColor: '#0a1315', color: '#FAFAF8', border: '1px solid #46655C', borderRadius: 4, fontSize: 13, minHeight: 44 }}
           />
           <button onClick={onCreate}
-            style={{ padding: '8px 16px', backgroundColor: '#D6F24B', color: '#0E2A2E', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', backgroundColor: '#D6F24B', color: '#0E2A2E', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 600, minHeight: 44, whiteSpace: 'nowrap' }}>
             + Novo Projeto
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+      <div className="projetos-container">
         {projects.map((project) => (
           <div
             key={project.id}

@@ -127,7 +127,17 @@ export default function StudioEditor({ project, templates, onProjectUpdate, onBa
   if (!currentSlide) return <div style={{ padding: 24, color: C.gelo }}>Carregando…</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#060c0d' }}>
+    <div className="studio-shell" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#060c0d' }}>
+      <style>{`
+        @media (max-width: 900px) {
+          .studio-shell { height: auto !important; min-height: 100vh; }
+          .studio-grid { grid-template-columns: 1fr !important; height: auto !important; min-height: 0 !important; }
+          .studio-grid > * { height: auto !important; min-height: 0 !important; }
+          .studio-grid > *:nth-child(1) { order: 3; }
+          .studio-grid > *:nth-child(2) { order: 1; min-height: 58vh; }
+          .studio-grid > *:nth-child(3) { order: 2; }
+        }
+      `}</style>
       <EditorTopbar
         project={project}
         saveStatus={saveStatus}
@@ -142,7 +152,7 @@ export default function StudioEditor({ project, templates, onProjectUpdate, onBa
         onExportZip={exporter.exportZip}
       />
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) 300px', minHeight: 0 }}>
+      <div className="studio-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) 300px', minHeight: 0 }}>
         <TemplateLibrary templates={templates} onApply={applyTemplate} />
 
         <SlideWorkspace

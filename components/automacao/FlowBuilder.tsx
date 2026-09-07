@@ -146,6 +146,21 @@ export function FlowBuilder() {
 
   return (
     <>
+      <style>{`
+        .flow-builder-btn {
+          min-height: 44px;
+          min-width: 44px;
+          padding: clamp(0.5rem, 2vw, 0.75rem) clamp(0.75rem, 2vw, 1rem) !important;
+          font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+        }
+        @media (max-width: 1024px) {
+          .flow-builder-main {
+            flex-direction: column !important;
+            height: auto !important;
+            min-height: calc(100vh - 300px);
+          }
+        }
+      `}</style>
       <PageHeader
         tag="AUTOMAÇÃO"
         title="Automação"
@@ -153,48 +168,45 @@ export function FlowBuilder() {
         actions={
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
+              className="flow-builder-btn"
               onClick={() => setShowPreview(!showPreview)}
               disabled={!selectedFlow || selectedFlow.blocks.length === 0}
               style={{
                 backgroundColor: 'transparent',
                 border: '1px solid #D6F24B',
                 color: '#D6F24B',
-                padding: '0.5rem 1rem',
                 cursor: selectedFlow && selectedFlow.blocks.length > 0 ? 'pointer' : 'not-allowed',
                 fontWeight: 600,
-                fontSize: '0.875rem',
                 opacity: selectedFlow && selectedFlow.blocks.length > 0 ? 1 : 0.5,
               }}
             >
               {showPreview ? '✕ Fechar teste' : '▶️ Testar fluxo'}
             </button>
             <button
+              className="flow-builder-btn"
               onClick={saveFlow}
               disabled={!selectedFlow}
               style={{
                 backgroundColor: 'transparent',
                 border: '1px solid #0E2A2E',
                 color: '#0E2A2E',
-                padding: '0.5rem 1rem',
                 cursor: selectedFlow ? 'pointer' : 'not-allowed',
                 fontWeight: 600,
-                fontSize: '0.875rem',
                 opacity: selectedFlow ? 1 : 0.5,
               }}
             >
               Salvar como rascunho
             </button>
             <button
+              className="flow-builder-btn"
               onClick={activateFlow}
               disabled={!selectedFlow}
               style={{
                 backgroundColor: '#D6F24B',
                 color: '#0E2A2E',
-                padding: '0.5rem 1rem',
                 border: 'none',
                 cursor: selectedFlow ? 'pointer' : 'not-allowed',
                 fontWeight: 600,
-                fontSize: '0.875rem',
                 opacity: selectedFlow ? 1 : 0.5,
               }}
             >
@@ -204,7 +216,7 @@ export function FlowBuilder() {
         }
       />
 
-      <main style={{ display: 'flex', height: 'calc(100vh - 120px)', backgroundColor: '#FAFAF8' }}>
+      <main className="flow-builder-main" style={{ display: 'flex', height: 'calc(100vh - 200px)', minHeight: '400px', backgroundColor: '#FAFAF8' }}>
         <FunnelList
           flows={flows}
           selected={selectedFlow}

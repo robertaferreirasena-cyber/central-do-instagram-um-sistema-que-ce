@@ -57,17 +57,21 @@ export function Sidebar({ brandName }: SidebarProps) {
   return (
     <>
       <style>{`
-        @media (max-width: 1023px) {
+        @media (max-width: 1024px) {
           aside {
             position: fixed;
             transform: translateX(${isOpen ? '0' : '-280px'});
             transition: transform 300ms ease;
             z-index: 50;
+            width: 280px;
+            max-width: 90vw;
           }
           .sidebar-toggle {
             display: flex !important;
             align-items: center;
             justify-content: center;
+            min-height: 44px;
+            min-width: 44px;
           }
           .sidebar-backdrop {
             display: ${isOpen ? 'block' : 'none'};
@@ -77,12 +81,18 @@ export function Sidebar({ brandName }: SidebarProps) {
             z-index: 40;
           }
         }
-        @media (min-width: 1024px) {
+        @media (min-width: 1025px) {
           .sidebar-toggle {
             display: none !important;
           }
           .sidebar-backdrop {
             display: none !important;
+          }
+        }
+        @media (max-width: 640px) {
+          aside {
+            width: 240px;
+            max-width: 85vw;
           }
         }
       `}</style>
@@ -128,7 +138,7 @@ export function Sidebar({ brandName }: SidebarProps) {
       }}
     >
       {/* Logo */}
-      <div style={{ padding: '1.5rem', borderBottom: '1px solid #1A3A40' }}>
+      <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', borderBottom: '1px solid #1A3A40' }}>
         <Link
           href="/visao-geral"
           style={{
@@ -137,6 +147,7 @@ export function Sidebar({ brandName }: SidebarProps) {
             gap: '0.5rem',
             textDecoration: 'none',
             color: '#FAFAF8',
+            minHeight: '44px',
           }}
         >
           <div
@@ -146,7 +157,7 @@ export function Sidebar({ brandName }: SidebarProps) {
               gap: '0.5rem',
               fontFamily: archivo.style.fontFamily,
               fontWeight: 900,
-              fontSize: '1rem',
+              fontSize: 'clamp(0.75rem, 2vw, 1rem)',
               letterSpacing: '-0.02em',
             }}
           >
@@ -185,17 +196,18 @@ export function Sidebar({ brandName }: SidebarProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.75rem',
-                padding: '0.75rem 1rem',
+                padding: 'clamp(0.6rem, 2vw, 0.75rem) clamp(0.8rem, 2vw, 1rem)',
                 color: active ? '#FAFAF8' : '#A8BDB5',
                 textDecoration: 'none',
                 position: 'relative',
                 transition: 'color 200ms ease',
                 fontFamily: jetBrainsMono.style.fontFamily,
-                fontSize: '0.875rem',
+                fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
                 fontWeight: 500,
                 borderLeft: active ? '3px solid #D6F24B' : 'none',
-                paddingLeft: active ? 'calc(1rem - 3px)' : '1rem',
+                paddingLeft: active ? 'calc(clamp(0.8rem, 2vw, 1rem) - 3px)' : 'clamp(0.8rem, 2vw, 1rem)',
                 backgroundColor: active ? 'rgba(214, 242, 75, 0.1)' : 'transparent',
+                minHeight: '44px',
               }}
             >
               <span style={{ fontSize: '1.25rem' }}>{item.icon}</span>
@@ -206,14 +218,14 @@ export function Sidebar({ brandName }: SidebarProps) {
       </nav>
 
       {/* Workspace Selector */}
-      <div style={{ padding: '1rem', borderTop: '1px solid #1A3A40' }}>
+      <div style={{ padding: 'clamp(0.75rem, 2vw, 1rem)', borderTop: '1px solid #1A3A40' }}>
         <button
           style={{
             width: '100%',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            padding: '0.75rem',
+            padding: 'clamp(0.6rem, 2vw, 0.75rem)',
             backgroundColor: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '0',
@@ -221,9 +233,10 @@ export function Sidebar({ brandName }: SidebarProps) {
             cursor: 'pointer',
             textAlign: 'left',
             fontFamily: jetBrainsMono.style.fontFamily,
-            fontSize: '0.75rem',
+            fontSize: 'clamp(0.65rem, 1.5vw, 0.75rem)',
             fontWeight: 500,
             transition: 'background-color 200ms ease',
+            minHeight: '44px',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';

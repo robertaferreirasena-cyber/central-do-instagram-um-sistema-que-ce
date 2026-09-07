@@ -52,12 +52,12 @@ export function FlowCanvas({ flow, onEditBlock, onDeleteBlock, onAddBlockWithTyp
         backgroundColor: '#FAFAF8',
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: '2rem',
+        padding: 'clamp(1rem, 4vw, 2rem)',
         backgroundImage: 'radial-gradient(circle, #E2E2DE 1px, transparent 1px)',
         backgroundSize: '20px 20px',
       }}
     >
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
         {flow.blocks.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <p style={{ color: '#7A8B84', marginBottom: '1rem' }}>Seu fluxo está vazio</p>
@@ -67,10 +67,12 @@ export function FlowCanvas({ flow, onEditBlock, onDeleteBlock, onAddBlockWithTyp
                 backgroundColor: '#D6F24B',
                 color: '#0E2A2E',
                 border: 'none',
-                padding: '0.75rem 1.5rem',
+                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
                 fontWeight: 600,
                 borderRadius: '4px',
                 cursor: 'pointer',
+                minHeight: '44px',
+                minWidth: '44px',
               }}
             >
               + Adicionar primeiro bloco

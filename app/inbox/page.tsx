@@ -323,7 +323,18 @@ export default function InboxPage() {
         }
       />
 
-      <main style={{ padding: '1.25rem 1.5rem', height: 'calc(100vh - 88px)', minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '300px minmax(0,1fr) 300px', gap: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
+      <style>{`
+        .inbox-back { display: none; }
+        @media (max-width: 900px) {
+          .inbox-grid { grid-template-columns: 1fr !important; height: auto !important; min-height: calc(100vh - 88px); overflow: visible !important; }
+          .inbox-grid > * { height: auto !important; min-height: 0 !important; }
+          .inbox-grid[data-sel="0"] > *:nth-child(2), .inbox-grid[data-sel="0"] > *:nth-child(3) { display: none !important; }
+          .inbox-grid[data-sel="1"] > *:nth-child(1), .inbox-grid[data-sel="1"] > *:nth-child(3) { display: none !important; }
+          .inbox-grid[data-sel="1"] > *:nth-child(2) { min-height: calc(100vh - 150px) !important; }
+          .inbox-back { display: inline-flex !important; align-items: center; }
+        }
+      `}</style>
+      <main className="inbox-grid" data-sel={selectedId ? '1' : '0'} style={{ padding: '1.25rem 1.5rem', height: 'calc(100vh - 88px)', minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '300px minmax(0,1fr) 300px', gap: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
         {/* COLUNA ESQUERDA: Filtros e Lista de Conversas */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0, height: '100%' }}>
           {/* Filtros */}
@@ -452,6 +463,7 @@ export default function InboxPage() {
             {/* Header */}
             <div style={{ borderBottom: '1px solid #E2E2DE', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button className="inbox-back" onClick={() => setSelectedId(null)} aria-label="Voltar" style={{ background: 'none', border: 'none', color: '#0E2A2E', fontSize: '1.4rem', cursor: 'pointer', padding: '0 0.25rem 0 0', lineHeight: 1 }}>←</button>
                 <div style={{ width: '36px', height: '36px', borderRadius: '9999px', backgroundColor: '#D6F24B' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#0E2A2E' }}>
